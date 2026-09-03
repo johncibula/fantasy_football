@@ -1,0 +1,36 @@
+# League configuration — non-secret settings.
+# Secrets (LEAGUE_ID, ESPN_S2, SWID) live in .env
+season: 2026
+team_id: 7             # "Bob's got a hog" (verified by SWID match)
+draft:
+  date: 2026-09-06     # from ESPN mock lobby "Live Draft Date: Sun, Sep 6"
+  slot: null           # John's pick position, 1-16; filled in automatically by
+                       # the poller once ESPN publishes the draft order
+  rounds: 15
+league:
+  name: "F³"
+  size: 16
+  scoring: full_ppr    # VERIFIED via ESPN settings 2026-08-27: 1.0/reception (user thought half)
+  pass_td: 4
+  playoff_teams: 8
+  reg_season_weeks: 14
+  waivers: priority    # no FAAB
+  roster:
+    QB: 1
+    RB: 2
+    WR: 2
+    TE: 1
+    FLEX: 1            # RB/WR/TE
+    DST: 1
+    K: 1
+    BENCH: 6
+    IR: 1
+
+# Where the draft board's inputs come from — re-export in this exact format,
+# don't substitute a different site's rankings without updating draft_board.py.
+sources:
+  udk:
+    provider: "Fantasy Footballers UDK (Ultimate Draft Kit)"
+    format: full-PPR CSV export
+    path: data/udk/
+    files: [qb.csv, rb.csv, wr.csv, te.csv, flex.csv, dst.csv, k.csv, top200.csv]

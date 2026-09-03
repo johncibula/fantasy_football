@@ -1,0 +1,216 @@
+<meta charset="utf-8">
+<title>F³ Draft Engine</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<style>
+:root {
+  --ground:#F6F7F4; --panel:#FFFFFF; --ink:#182028; --ink2:#5A6572; --line:#DDE1DA;
+  --band:#ECEFE9; --rb:#2E7D5B; --wr:#2B62A8; --te:#C05A21; --qb:#8E3B46; --util:#5A6572;
+  --good:#1E7A46; --goodbg:#E2F1E7; --bad:#A93226; --badbg:#F6E4E1; --flag:#8A6D1D; --flagbg:#F3ECD4;
+  --accent:#2E7D5B;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#141A21; --panel:#1C242E; --ink:#E8ECEF; --ink2:#98A4B0; --line:#2B3540;
+    --band:#202A35; --rb:#4FAE85; --wr:#6C9FD8; --te:#E08A50; --qb:#C76D7B; --util:#98A4B0;
+    --good:#5BC488; --goodbg:#1C3327; --bad:#E08578; --badbg:#3A2320; --flag:#D8BC62; --flagbg:#322B15;
+    --accent:#4FAE85;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#141A21; --panel:#1C242E; --ink:#E8ECEF; --ink2:#98A4B0; --line:#2B3540;
+  --band:#202A35; --rb:#4FAE85; --wr:#6C9FD8; --te:#E08A50; --qb:#C76D7B; --util:#98A4B0;
+  --good:#5BC488; --goodbg:#1C3327; --bad:#E08578; --badbg:#3A2320; --flag:#D8BC62; --flagbg:#322B15;
+  --accent:#4FAE85;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Source Sans 3","Helvetica Neue",Arial,sans-serif; font-size:16px; line-height:1.55; }
+.wrap { max-width:820px; margin:0 auto; padding:36px 22px 80px; }
+h1 { font-family:"Barlow Condensed","Arial Narrow",sans-serif; font-size:44px; font-weight:700;
+  letter-spacing:1px; margin:0 0 4px; text-wrap:balance; }
+.sub { color:var(--ink2); margin:0 0 34px; max-width:65ch; }
+h2 { font-family:"Barlow Condensed",sans-serif; font-size:24px; font-weight:700; letter-spacing:1px;
+  text-transform:uppercase; margin:44px 0 10px; padding:6px 12px; background:var(--band);
+  border-left:5px solid var(--accent); }
+h3 { font-size:17px; margin:24px 0 6px; }
+p { max-width:70ch; margin:10px 0; }
+.formula { font-family:"Barlow Condensed",sans-serif; font-size:22px; font-weight:600; letter-spacing:.5px;
+  background:var(--panel); border:1px solid var(--line); padding:14px 18px; margin:16px 0;
+  overflow-x:auto; white-space:nowrap; }
+.formula b { color:var(--accent); }
+table { border-collapse:collapse; width:100%; margin:14px 0; background:var(--panel);
+  font-variant-numeric:tabular-nums; }
+.scrollx { overflow-x:auto; }
+th { font-family:"Barlow Condensed",sans-serif; font-size:14px; letter-spacing:1px; text-transform:uppercase;
+  color:var(--ink2); text-align:left; padding:7px 10px; border-bottom:2px solid var(--line); }
+td { padding:6px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+tr:last-child td { border-bottom:none; }
+.pos { font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:13px; border:1.5px solid;
+  padding:0 4px; display:inline-block; }
+.pos.RB{color:var(--rb);border-color:var(--rb)} .pos.WR{color:var(--wr);border-color:var(--wr)}
+.pos.TE{color:var(--te);border-color:var(--te)} .pos.QB{color:var(--qb);border-color:var(--qb)}
+.pos.DST,.pos.K{color:var(--util);border-color:var(--util)}
+.chip { font-size:12px; font-weight:700; padding:1px 7px; border-radius:2px; white-space:nowrap; }
+.chip.good { color:var(--good); background:var(--goodbg); }
+.chip.bad { color:var(--bad); background:var(--badbg); }
+.chip.flag { color:var(--flag); background:var(--flagbg); }
+.ex { background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--wr);
+  padding:12px 16px; margin:14px 0; max-width:74ch; }
+.ex b:first-child { font-family:"Barlow Condensed",sans-serif; letter-spacing:.5px; text-transform:uppercase;
+  font-size:14px; color:var(--ink2); display:block; margin-bottom:4px; }
+.cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin:14px 0; }
+.card { background:var(--panel); border:1px solid var(--line); padding:12px 14px; }
+.card h4 { font-family:"Barlow Condensed",sans-serif; font-size:17px; letter-spacing:1px; margin:0 0 6px;
+  text-transform:uppercase; }
+.small { font-size:13.5px; color:var(--ink2); }
+.num { text-align:right; }
+footer { margin-top:50px; color:var(--ink2); font-size:13px; border-top:1px solid var(--line); padding-top:14px; }
+</style>
+<div class="wrap">
+<h1>F³ DRAFT ENGINE</h1>
+<p class="sub">How the draft-day recommendation engine thinks: the scoring formula, the opponent-monitoring
+model, the strategy overrides, and the 30-mock tuning run that shaped it. League: F³ — 16 teams, full PPR,
+draft Sunday Sep 6, 7:00 PM, 60 seconds per pick.</p>
+
+<h2>The one-line summary</h2>
+<p>Follow the Fantasy Footballers' tiers, tilted by John's scouting; never pay for a bust; hold cheap
+positions (QB, TE) until the moment the market is about to close them — and know that moment precisely,
+because the engine watches all 15 other rosters on every pick.</p>
+
+<h2>The scoring formula</h2>
+<p>At every turn the engine scores <em>every available player</em> and recommends the lowest score —
+think of it as an "effective draft rank."</p>
+<div class="formula">score = <b>UDK rank</b> + <b>tags</b> − <b>need×6</b> − <b>VBD×0.15</b> + <b>strategy overrides</b></div>
+
+<div class="scrollx"><table>
+<tr><th>Force</th><th>Size</th><th>What it does</th></tr>
+<tr><td><b>UDK rank</b> (backbone)</td><td>1–200+</td><td>The Ballers' full-PPR overall rank is the starting score. Every other force is a bounded adjustment, so the engine can only move a player a round or two — except in declared emergencies.</td></tr>
+<tr><td><b>Bust tag</b></td><td class="num">+12</td><td>Roughly a full round of penalty. Someone else pays the inflated price.</td></tr>
+<tr><td><b>Value / Breakout tag</b></td><td class="num">−4</td><td>Pulls a target up ~half a round; breaks ties, never overrides the board.</td></tr>
+<tr><td><b>Sleeper tag</b></td><td class="num">−2</td><td>Light thumb on the scale for late-round darts.</td></tr>
+<tr><td><b>Roster need</b></td><td class="num">−1 to −10</td><td>Positional urgency (0.1–1.6) × 6. Missing starter ≈ −10; bench depth ≈ −3; position full ≈ −0.6.</td></tr>
+<tr><td><b>Lineup value (VBD)</b></td><td class="num">−0 to −15</td><td>15% of projected points above this league's replacement level (QB18 / RB40 / WR44 / TE18). Teaches the engine that a 100-point TE edge beats a 30-point WR-bench edge.</td></tr>
+</table></div>
+
+<h2>Opponent monitoring — the survival model</h2>
+<p>For each candidate, the engine asks: <em>will he still be there at my next pick?</em> It walks every
+intervening pick and estimates that specific team's chance of taking him — a team already holding two RBs
+is far less likely to take a third (the original design insight), scaled by how overdue the player is
+versus ADP. Multiplying through the 15–30 picks between turns yields the survival percentage on the
+dashboard: <span class="chip bad">5% — now or never</span> vs.
+<span class="chip good">65% — safe to wait</span>.</p>
+<p>Survival is used twice: directly, to time non-urgent picks; and as the <b>trigger for strategy
+escalations</b> — the engine escalates on math, not vibes.</p>
+
+<h2>Strategy overrides</h2>
+<div class="cols">
+<div class="card"><h4>QB punt floor</h4>Wait on QB while the tagged targets (Dak, Stafford, Purdy, Dart,
+Lawrence) survive. When the <b>expected number surviving to the next pick drops below 1.5</b>, the best
+target gets −45 and force-ranks. Fires mid-run, before the pool dies.</div>
+<div class="card"><h4>TE great-or-late</h4>Take a tier-1 TE when the board says so (VBD handles it) — otherwise
+wait for the tagged late pool (Likely, Strange, Chig, Dulcich). Same survival trigger, −30, active from round 5.</div>
+<div class="card"><h4>Bench composition</h4>From round 5: −8 per RB short of four; +12 per WR beyond four.
+Gated so it never distorts the early tier board (lesson learned when it briefly stole round 2 from tier-1
+Trey McBride at 4% survival).</div>
+<div class="card"><h4>Hard rules</h4>Never a 3rd QB/TE (+60) or 2nd K/D-ST (+200); no K/D-ST early (+120);
+in the final picks, missing K/D-ST slots get −100 — the lineup is always legal.</div>
+</div>
+
+<h2>Worked examples</h2>
+<div class="ex"><b>The defining pick — Lawrence over Gainwell</b>
+Mock #2, our pick 103. Kenny Gainwell <span class="pos RB">RB</span> UDK 78 vs. Trevor Lawrence
+<span class="pos QB">QB</span> UDK ~130. A QB run was underway (all five targets gone by pick 121).
+Expected surviving targets: 0.9 → escalation fires → Lawrence 130 − 45 = <b>85 effective</b>, beating
+Gainwell. Worth ~60 projected points at the QB slot; the roster's league rank jumps from 8th to top-4.
+One round earlier, with the pool still healthy, the engine correctly stayed patient.</div>
+<div class="ex"><b>The bust shield — Jeremiyah Love</b>
+Love sat at UDK #21 — a top-25 player routinely available in round 2 — in all 30 mocks. The +12 bust
+penalty (4.5-win team, committee backfield, ankle injury) pushed him behind clean players every time.
+<b>Zero players from the bust list were drafted in 30 mocks.</b></div>
+<div class="ex"><b>Lineup value — Bowers over WR #6</b>
+Brock Bowers projects ~100 points above the 18th TE (−15) while a sixth WR projects ~30 over waiver level
+(−4.5). Before the VBD term the engine hoarded WRs; after it, slot 16 took Bowers at the turn and slot 7
+landed McBride — the "great" branch firing only when the price was right.</div>
+<div class="ex"><b>Patience — Garrett Wilson at 65%</b>
+First live mock, pick 26 prep: Ken Walker showed 5% survival (take now), Garrett Wilson 65% (wait a round).
+Wilson is UDK #20 with a round-4 ADP — the league's biggest full-PPR mispricing — and the survival model
+is what lets the engine harvest him a round late instead of reaching.</div>
+
+<h2>Tuning arc — 30 self-play mocks</h2>
+<div class="scrollx"><table>
+<tr><th>Batch</th><th>Engine version</th><th>League ranks (of 16)</th><th>Worst</th></tr>
+<tr><td>1</td><td>survival QB floor only</td><td>1, 2, 2, 2, 7, 4</td><td class="num">7</td></tr>
+<tr><td>2</td><td>+ TE escalation, QB2 delay</td><td>2, 4, 4, 8, 3, 9</td><td class="num">9</td></tr>
+<tr><td>3</td><td>+ lineup-value (VBD) term</td><td>1, 2, 2, 6, 4, 10</td><td class="num">10</td></tr>
+<tr><td><b>4–5 final</b></td><td>+ RB-depth &amp; WR-cap retune</td><td><b>1, 1, 1, 4, 2, 2, 1, 1, 7, 5, 4, 3</b></td><td class="num"><b>7</b></td></tr>
+</table></div>
+<p>Final engine: top-5 in 10 of 12 validation drafts, #1 in five, from every part of the order; legal
+roster every time; 4–7 tagged players per draft; zero busts across all 30 runs.</p>
+
+<h2>Where in the draft order?</h2>
+<div class="scrollx"><table>
+<tr><th>Region</th><th>Slots</th><th>Final-engine ranks</th><th>Mean</th></tr>
+<tr><td><b>Early</b></td><td>1, 4</td><td>1, 1, 1, 1</td><td class="num"><b>1.0</b></td></tr>
+<tr><td><b>Turn / wheel</b></td><td>13, 16</td><td>2, 2, 4, 3</td><td class="num">2.75</td></tr>
+<tr><td><b>Middle</b></td><td>7, 10</td><td>1, 4, 7, 5</td><td class="num">4.25</td></tr>
+</table></div>
+<p>Early slots dominated: a locked tier-1 anchor (Gibbs every time) plus the engine's value harvesting
+compounds cleanly. The wheel's double-picks let it pair needs back-to-back. The middle was hardest —
+longest exposure to runs arriving from both directions. Small sample (30 drafts), but the ordering
+matches fantasy orthodoxy.</p>
+
+<h2>The three best teams drafted</h2>
+<p>All three share a spine: <b>Gibbs anchor → Garrett Wilson round 2–3 → Dart in round 7 → tagged-TE
+endgame → Houston D-ST + Aubrey</b>. The engine independently converged on this shape from different
+slots and seeds.</p>
+<div class="cols">
+<div class="card"><h4>#1 — slot 4 · proj 1761</h4><div class="small">
+R1 Gibbs · R2 Olave · R3 <b>Garrett Wilson</b> · R4 Watson <span class="chip flag">BRKT</span> ·
+R5 Stevenson · R6 Croskey-Merritt <span class="chip good">SLPR</span> · R7 <b>Dart</b>
+<span class="chip flag">BRKT</span> · R8 M.Washington · R9 Boutte · R10 Chig
+<span class="chip good">SLPR</span> · R11 Pacheco · R12 Dulcich · R13 HOU D · R14 Aubrey · R15 Mooney</div></div>
+<div class="card"><h4>#2 — slot 1 · proj 1752</h4><div class="small">
+R1 Gibbs · R2 <b>Garrett Wilson</b> · R3 Waddle <span class="chip good">TGT</span> ·
+R4 Parker Washington <span class="chip good">SLPR</span> · R5 Jadarian Price · R6 Gainwell ·
+R7 <b>Dart</b> <span class="chip flag">BRKT</span> · R8 M.Washington · R9 Shaheed · R10 Chig
+<span class="chip good">SLPR</span> · R11 Pacheco · R12 Freiermuth · R13 HOU D · R14 Aubrey · R15 Mooney</div></div>
+<div class="card"><h4>#3 — slot 1 · proj 1742</h4><div class="small">
+R1 Gibbs · R2 <b>Garrett Wilson</b> · R3 Waddle <span class="chip good">TGT</span> ·
+R4 Parker Washington <span class="chip good">SLPR</span> · R5 Dowdle · R6 Croskey-Merritt
+<span class="chip good">SLPR</span> · R7 <b>Dart</b> <span class="chip flag">BRKT</span> ·
+R8 M.Washington · R9 Boutte · R10 Tucker · R11 Chig <span class="chip good">SLPR</span> ·
+R12 Dulcich · R13 HOU D · R14 Aubrey · R15 Vidal</div></div>
+</div>
+
+<h2>The three worst teams drafted (final engine)</h2>
+<p>Worth studying because they show the engine's <em>risk profile</em>, not bugs. None fell below 7th of 16.
+The shared failure pattern: when opponents strip the round-4–7 RB/WR shelf clean, the engine's fallback tier
+(UDK 95–125: Malik Washington, Boutte, Doubs, Tucker) is all floor and no ceiling, and both punts —
+QB and TE — land their <em>floor</em> outcomes at once. That's the accepted cost of the punt strategy:
+its downside is mediocrity, never catastrophe.</p>
+<div class="cols">
+<div class="card"><h4>Worst — slot 7 · rank 7 · proj 1663</h4><div class="small">
+R1 Puka · R2 Jeanty · R3 Waddle <span class="chip good">TGT</span> · R4 Tuten
+<span class="chip flag">BRKT</span> · R5 Dowdle · R6 Croskey-Merritt <span class="chip good">SLPR</span> ·
+R7 Dart <span class="chip flag">BRKT</span> · R8–10 M.Washington/Boutte/Tucker · R11 Dulcich ·
+R12 Freiermuth · R13–14 HOU D/Aubrey · R15 Vele<br>
+<b>What went wrong:</b> four depth RBs by round 6 left WR3 at UDK 101; TE double-punt hit its floor.</div></div>
+<div class="card"><h4>2nd worst — slot 10 · rank 5 · proj 1661</h4><div class="small">
+R1 Puka · R2 Olave · R3 Swift <span class="chip good">TGT</span> · R4 Tuten
+<span class="chip flag">BRKT</span> · R5 Stevenson · R6 Dart <span class="chip flag">BRKT</span> ·
+R7 Stribling <span class="chip good">SLPR</span> · R8–10 Doubs/M.Washington/Boutte · R11 Dulcich ·
+R12 Daniel Jones · R13–14 HOU D/Aubrey · R15 Otton<br>
+<b>What went wrong:</b> a wasted QB2 (Daniel Jones) and a TE room of Dulcich + Otton; WR bench all floor.</div></div>
+<div class="card"><h4>3rd worst — slot 10 · rank 4 · proj 1696</h4><div class="small">
+R1 J.Taylor · R2 Olave · R3 Waddle <span class="chip good">TGT</span> · R4 Tate
+<span class="chip flag">BRKT</span> · R5 Stevenson · R6 Croskey-Merritt <span class="chip good">SLPR</span> ·
+R7 Dart <span class="chip flag">BRKT</span> · R8–9 M.Washington/Boutte · R10 Schultz · R11 Chig
+<span class="chip good">SLPR</span> · R12 Cam Ward · R13–14 HOU D/Aubrey · R15 Ridley<br>
+<b>What went wrong:</b> honestly, little — only 5.7 projected points behind the league's best team.
+A reminder that rank 4 of 16 can be a coin flip, not a flaw.</div></div>
+</div>
+
+<footer>Built from the Fantasy Footballers UDK (full-PPR export) + John's sleeper/breakout/bust/value/watch
+notes + verified F³ league settings. Draft-day stack: ESPN API poller (2s) → recommendation engine →
+live dashboard. Sources: src/draft_live.py, src/draft_tracker.py, src/self_mock.py.</footer>
+</div>

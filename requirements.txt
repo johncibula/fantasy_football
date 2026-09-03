@@ -1,0 +1,7 @@
+espn_api
+pandas
+openpyxl
+python-dotenv
+PyYAML
+requests
+pytest

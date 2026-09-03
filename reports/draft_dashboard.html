@@ -1,0 +1,340 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>F³ Draft Command</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root {
+  --ground:#141A21; --panel:#1C242E; --panel2:#202A35; --ink:#E8ECEF; --ink2:#98A4B0;
+  --line:#2B3540; --rb:#4FAE85; --wr:#6C9FD8; --te:#E08A50; --qb:#C76D7B; --util:#98A4B0;
+  --good:#5BC488; --goodbg:#1C3327; --bad:#E08578; --badbg:#3A2320; --flag:#D8BC62; --flagbg:#322B15;
+  --accent:#4FAE85;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Source Sans 3",Arial,sans-serif; font-size:15px; }
+header { display:flex; align-items:center; gap:20px; padding:10px 18px;
+  background:var(--panel); border-bottom:2px solid var(--line); flex-wrap:wrap; }
+h1 { font-family:"Barlow Condensed",sans-serif; font-size:24px; margin:0; letter-spacing:1px; }
+.stat { text-align:center; }
+.stat .n { font-family:"Barlow Condensed",sans-serif; font-size:26px; font-weight:700; line-height:1;
+  font-variant-numeric:tabular-nums; }
+.stat .l { font-size:11px; color:var(--ink2); text-transform:uppercase; letter-spacing:1px; }
+.stat.hot .n { color:var(--good); }
+#updated { margin-left:auto; color:var(--ink2); font-size:12px; }
+#updated .stale { color:var(--bad); font-weight:700; }
+main { display:grid; grid-template-columns: 1fr 340px; gap:14px; padding:14px 18px; max-width:1400px; }
+@media (max-width:900px){ main { grid-template-columns:1fr; } }
+section { background:var(--panel); border:1px solid var(--line); }
+h2 { font-family:"Barlow Condensed",sans-serif; font-size:16px; letter-spacing:1.5px;
+  text-transform:uppercase; margin:0; padding:8px 12px; background:var(--panel2);
+  border-bottom:1px solid var(--line); display:flex; justify-content:space-between; }
+.rec { display:grid; grid-template-columns:30px 44px 1fr 90px 74px auto; gap:10px;
+  align-items:center; padding:7px 12px; border-bottom:1px solid var(--line); }
+.rec:first-of-type { background:var(--goodbg); }
+.rec .i { color:var(--ink2); font-variant-numeric:tabular-nums; text-align:right; }
+.pos { font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:14px;
+  text-align:center; border:1.5px solid; padding:0 3px; }
+.pos.RB{color:var(--rb);border-color:var(--rb)} .pos.WR{color:var(--wr);border-color:var(--wr)}
+.pos.TE{color:var(--te);border-color:var(--te)} .pos.QB{color:var(--qb);border-color:var(--qb)}
+.pos.DST,.pos.K{color:var(--util);border-color:var(--util)}
+.nm { font-weight:700; }
+.nm small { color:var(--ink2); font-weight:400; margin-left:6px; }
+.meta { color:var(--ink2); font-size:13px; font-variant-numeric:tabular-nums; }
+.surv { font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:16px;
+  font-variant-numeric:tabular-nums; }
+.surv.gone { color:var(--bad); } .surv.safe { color:var(--good); }
+.chips span { font-size:11px; font-weight:700; padding:1px 6px; margin-left:4px;
+  border:1.5px solid currentColor; border-radius:2px; }
+.t-sleeper{color:var(--wr)} .t-breakout{color:var(--te)} .t-value{color:var(--good)}
+.t-bust{color:var(--bad)} .t-watch{color:var(--ink2)}
+.note { grid-column:3/-1; color:var(--ink2); font-size:12.5px; padding-bottom:2px; }
+.room { font-size:10px; font-weight:700; padding:0 4px; margin-left:6px; border-radius:2px;
+  border:1.5px solid var(--ink2); color:var(--ink2); }
+.room.slide { border-color:var(--good); color:var(--good); }
+.room.reach { border-color:var(--bad); color:var(--bad); }
+.injchip { font-size:10px; font-weight:700; padding:0 4px; margin-left:6px;
+  border:1.5px solid var(--bad); color:var(--bad); border-radius:2px; }
+.wait { grid-column:3/-1; color:var(--ink2); font-size:12px; font-style:italic; padding-bottom:2px; }
+.why-top { grid-column:3/-1; display:flex; flex-wrap:wrap; gap:7px; font-size:11.5px;
+  color:var(--ink2); padding-top:1px; align-items:center; }
+.why-top .f, .why-rest .f { white-space:nowrap; }
+.why-top .f.good, .why-rest .f.good { color:var(--good); }
+.why-top .f.bad, .why-rest .f.bad { color:var(--bad); }
+.why-toggle { cursor:pointer; color:var(--ink2); text-decoration:underline; font-size:11px; }
+.why-rest { grid-column:3/-1; display:flex; flex-wrap:wrap; gap:7px; font-size:11.5px;
+  color:var(--ink2); padding:1px 0 4px; }
+.teamcard .dna { color:var(--flag); font-size:11px; margin-top:4px; }
+.prof { grid-column:3/-1; font-size:12px; color:var(--ink2); line-height:1.4; padding:2px 0 6px; }
+.prof a { color:var(--flag); }
+.side section { margin-bottom:14px; }
+.row2 { display:flex; justify-content:space-between; padding:5px 12px;
+  border-bottom:1px solid var(--line); font-size:13.5px; }
+.row2 .who { color:var(--ink2); }
+.runbar { display:flex; gap:6px; padding:10px 12px; flex-wrap:wrap; }
+.runbar .pill { font-family:"Barlow Condensed",sans-serif; font-weight:700;
+  padding:2px 10px; border:1.5px solid var(--line); font-size:15px; }
+.pill.hot { border-color:var(--flag); color:var(--flag); background:var(--flagbg); }
+#myroster { padding:8px 12px; display:flex; flex-wrap:wrap; gap:6px; }
+#myroster span { background:var(--panel2); padding:2px 9px; font-size:13px; border:1px solid var(--line); }
+.draftbtn { font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:14px;
+  letter-spacing:1px; background:var(--accent); color:#0B1512; border:none; padding:4px 14px;
+  cursor:pointer; }
+.draftbtn:hover { filter:brightness(1.15); }
+#mockbar { display:none; align-items:center; gap:10px; padding:8px 18px; background:var(--panel2);
+  border-bottom:1px solid var(--line); flex-wrap:wrap; }
+#mockbar input { background:var(--ground); color:var(--ink); border:1px solid var(--line);
+  padding:5px 10px; font:inherit; width:230px; }
+#mockbar button.ghost { background:none; border:1px solid var(--line); color:var(--ink2);
+  padding:4px 12px; cursor:pointer; font:inherit; }
+#hits { position:relative; }
+#hitlist { position:absolute; top:100%; left:0; z-index:5; background:var(--panel);
+  border:1px solid var(--line); min-width:300px; }
+#hitlist div { padding:5px 10px; cursor:pointer; display:flex; justify-content:space-between; gap:14px; }
+#hitlist div:hover { background:var(--panel2); }
+#toast { color:var(--good); font-weight:700; }
+#turnbar { display:none; font-family:"Barlow Condensed",sans-serif; font-weight:700;
+  font-size:22px; letter-spacing:2px; text-align:center; padding:8px 16px;
+  border-bottom:2px solid var(--line); background:var(--panel); color:var(--ink2); }
+#turnbar.soon { color:var(--flag); background:var(--flagbg); }
+#turnbar.now { color:var(--ground); background:var(--accent); font-size:26px; }
+@media (prefers-reduced-motion: no-preference) {
+  #turnbar.now { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { filter:brightness(1.18); } }
+}
+.viewtabs { display:flex; gap:2px; }
+.viewtabs button { font-family:"Barlow Condensed",sans-serif; font-size:16px; font-weight:600;
+  letter-spacing:.5px; border:1px solid var(--line); background:var(--panel); color:var(--ink2);
+  padding:4px 14px; cursor:pointer; }
+.viewtabs button.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+#teamsgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+.teamcard { background:var(--panel); border:1px solid var(--line); padding:10px 12px; }
+.teamcard.us { border-color:var(--accent); border-width:2px; }
+.teamcard.clock { outline:2px dashed var(--flag); }
+.teamcard h3 { font-family:"Barlow Condensed",sans-serif; font-size:16px; letter-spacing:1px;
+  margin:0 0 6px; display:flex; justify-content:space-between; align-items:baseline; }
+.teamcard h3 .tag { font-size:12px; color:var(--flag); }
+.teamcard .counts { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:7px; }
+.teamcard .counts span { font-family:"Barlow Condensed",sans-serif; font-weight:700; font-size:13px;
+  border:1.5px solid var(--line); padding:0 6px; color:var(--ink2); }
+.teamcard .missing { color:var(--bad); font-size:12px; font-weight:700; margin-bottom:6px; }
+.teamcard ul { list-style:none; margin:0; padding:0; font-size:12.5px; }
+.teamcard li { display:flex; gap:6px; padding:1px 0; color:var(--ink); }
+.teamcard li .pk { color:var(--ink2); font-variant-numeric:tabular-nums; width:26px; text-align:right; }
+</style>
+</head>
+<body>
+<div id="mockbar">
+  <strong id="modelabel" style="font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;">MOCK MODE</strong>
+  <span id="hits"><input id="search" placeholder="Search any player…" autocomplete="off"><div id="hitlist"></div></span>
+  <button class="ghost" id="undobtn" onclick="api(isMock?'/api/undo':'/api/undo_last')">Undo</button>
+  <button class="ghost" id="newmockbtn" onclick="(function(){const s=prompt('Start a new mock — your draft slot (1-16)?','7');if(s&&+s>=1&&+s<=16)api('/api/start?slot='+(+s));})()">New mock…</button>
+  <span id="toast"></span>
+</div>
+<header>
+  <h1>F³ DRAFT COMMAND</h1>
+  <div class="stat"><div class="n" id="pickno">–</div><div class="l">pick</div></div>
+  <div class="stat"><div class="n" id="round">–</div><div class="l">round</div></div>
+  <div class="stat hot"><div class="n" id="until">–</div><div class="l">picks until ours</div></div>
+  <div class="stat"><div class="n" id="nextmine">–</div><div class="l">our next pick</div></div>
+  <div class="stat" id="syncstat"><div class="n" id="syncage">–</div><div class="l">last sync</div></div>
+  <div class="viewtabs" style="margin-left:20px">
+    <button id="tab-board" class="on" onclick="setView('board')">BOARD</button>
+    <button id="tab-teams" onclick="setView('teams')">TEAMS</button>
+  </div>
+  <div id="updated">–</div>
+</header>
+<div id="turnbar"></div>
+<div id="teamsview" style="display:none; padding:14px 18px;">
+  <div id="marketcard" style="margin-bottom:14px;"></div>
+  <div id="teamsgrid"></div>
+</div>
+<main>
+  <section>
+    <h2>Recommendations <span id="needline"></span></h2>
+    <div id="recs"></div>
+  </section>
+  <div class="side">
+    <section><h2>My Roster</h2><div id="myroster"></div></section>
+    <section><h2>Position Run (last 8)</h2><div class="runbar" id="runs"></div></section>
+    <section><h2>Recent Picks</h2><div id="recent"></div></section>
+  </div>
+</main>
+<script>
+let lastUpdated = null, lastFetch = 0, isMock = false, view = 'board', lastData = null;
+setInterval(() => {
+  const el = document.getElementById('syncage');
+  if (!lastData || !lastData.ts) { el.textContent = '–'; return; }
+  const age = Math.max(0, Math.round(Date.now()/1000 - lastData.ts));
+  el.textContent = age + 's';
+  el.style.color = age <= 15 ? 'var(--good)' : age <= 30 ? 'var(--flag)' : 'var(--bad)';
+}, 1000);
+function setView(v){
+  view = v;
+  document.getElementById('tab-board').classList.toggle('on', v==='board');
+  document.getElementById('tab-teams').classList.toggle('on', v==='teams');
+  document.querySelector('main').style.display = v==='board' ? '' : 'none';
+  document.getElementById('teamsview').style.display = v==='teams' ? '' : 'none';
+  if (lastData) renderTeams(lastData);
+}
+function renderTeams(d){
+  if (view !== 'teams') return;
+  const mk = d.market || {pos_flow:{}, notes:[]};
+  const flow = Object.entries(mk.pos_flow).map(([p,f])=>{
+    const cls = f.delta>=3?'chip bad':f.delta<=-3?'chip good':'chip flag';
+    const arrow = f.delta>0?'+'+f.delta+' hot':f.delta<0?f.delta+' cold':'on pace';
+    return '<span class="'+cls+'" style="margin-right:6px">'+p+' '+f.taken+' taken · '+arrow+'</span>';
+  }).join('');
+  document.getElementById('marketcard').innerHTML =
+    '<div class="teamcard" style="border-left:4px solid var(--accent)">'+
+    '<h3>MARKET READ <span class="tag">pick '+d.pick_no+'</span></h3>'+
+    '<div style="margin-bottom:8px">'+flow+'</div>'+
+    (mk.notes.length?'<ul style="list-style:none;margin:0;padding:0;font-size:13.5px;line-height:1.5">'+
+      mk.notes.map(n=>'<li>▸ '+n+'</li>').join('')+'</ul>':'')+
+    '</div>';
+  const order = Object.keys(d.rosters).map(Number).sort((a,b)=>a-b);
+  document.getElementById('teamsgrid').innerHTML = order.map(t => {
+    const r = d.rosters[t];
+    const cls = 'teamcard' + (t===d.our_slot?' us':'') + (t===d.on_clock_slot?' clock':'');
+    const label = t===d.our_slot ? 'US' : t===d.on_clock_slot ? 'ON CLOCK' : '';
+    const tl = (d.team_labels||{})[t];
+    const title = tl ? tl : 'SLOT '+t;
+    const counts = Object.entries(r.counts||{}).map(([p,c])=>'<span>'+p+' '+c+'</span>').join('');
+    const miss = r.missing || [];
+    const missing = miss.length ? '<div class="missing">needs: '+miss.join(', ')+'</div>' : '';
+    const players = (r.players||[]).map(pl => typeof pl === 'string'
+      ? '<li>'+pl+'</li>'
+      : '<li><span class="pk">'+pl.pick+'</span><span class="pos '+pl.p+'">'+(pl.p==='DST'?'D':pl.p)+'</span> '+pl.n+'</li>').join('');
+    const dnaLabels = ((d.dna||{})[t]||{}).labels || [];
+    const dna = dnaLabels.length ? '<div class="dna">DNA: '+dnaLabels.join(', ')+'</div>' : '';
+    return '<div class="'+cls+'"><h3><span>'+title+' <small style="color:var(--ink2)">#'+t+'</small></span> <span class="tag">'+label+'</span></h3>'+
+      '<div class="counts">'+counts+'</div>'+missing+dna+'<ul>'+players+'</ul></div>';
+  }).join('');
+}
+function chip(t){ return '<span class="t-'+t+'">'+({sleeper:"SLPR",bust:"BUST",breakout:"BRKT",value:"TGT",watch:"WATCH"}[t]||t)+'</span>'; }
+function esc(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
+function factorSpan(f){
+  const cls = f.delta == null ? '' : (f.delta > 0 ? 'bad' : 'good');
+  const sign = f.delta == null ? '' : (' ' + (f.delta > 0 ? '+' : '') + f.delta);
+  return '<span class="f '+cls+'" title="'+esc(f.detail)+'">'+esc(f.label)+sign+'</span>';
+}
+function profBlock(r, i){
+  const prof = r.profile || null;
+  const text = (prof && prof.summary) ? prof.summary : (r.outlook || '');
+  if (!text && !prof) return '';
+  const link = prof && prof.url ? ' <a href="'+esc(prof.url)+'" target="_blank" rel="noopener">profile ↗</a>'+(prof.fetched?' <small>('+esc(prof.fetched)+')</small>':'') : '';
+  const src = (prof && prof.summary) ? 'FF outlook' : 'UDK outlook';
+  let extra = '';
+  if (prof && prof.injury) extra += '<div><strong>Injury:</strong> '+esc(prof.injury)+(prof.injury_date?' ('+esc(prof.injury_date)+')':'')+'</div>';
+  if (prof && prof.news && prof.news.length) extra += '<div><strong>News:</strong> '+prof.news.map(n=>esc(n.headline)+' <small>('+esc(n.age)+')</small>').join(' · ')+'</div>';
+  if (prof && prof.hosts && Object.keys(prof.hosts).length) extra += '<div><small>Hosts: '+Object.entries(prof.hosts).map(([h,r])=>esc(h)+' #'+r).join(' · ')+(prof.adp?' · FF ADP '+esc(prof.adp):'')+'</small></div>';
+  return '<div class="prof" id="prof-'+i+'" hidden>'+extra+'<div><strong>'+src+':</strong> '+esc(text).replace(/&quot;/g,'"')+link+'</div></div>';
+}
+function toggleWhy(btn, i){
+  const pr = document.getElementById('prof-'+i);
+  if (pr) pr.hidden = !pr.hidden;
+  const el = document.getElementById('whyrest-'+i);
+  if (!el) return;
+  el.hidden = !el.hidden;
+  btn.textContent = el.hidden ? '▸ more' : '▾ less';
+}
+async function api(path){
+  try {
+    const r = await (await fetch(path)).json();
+    const t = document.getElementById('toast');
+    t.textContent = r.drafted ? ('Drafted '+r.drafted+' at pick '+r.at)
+      : r.taken ? (r.taken+' marked taken at pick '+r.at+(r.mine?' — that was OUR pick':' (slot '+r.slot+')'))
+      : r.removed ? ('Removed '+r.removed)
+      : (r.error || '');
+    setTimeout(()=>{ t.textContent=''; }, 4000);
+    tick();
+  } catch(e) {}
+}
+function draftName(n){
+  api((isMock?'/api/draft':'/api/taken')+'?name='+encodeURIComponent(n));
+  document.getElementById('hitlist').innerHTML=''; document.getElementById('search').value='';
+}
+document.addEventListener('input', async e => {
+  if (e.target.id !== 'search') return;
+  const q = e.target.value.trim();
+  const box = document.getElementById('hitlist');
+  if (q.length < 2) { box.innerHTML=''; return; }
+  const hits = await (await fetch('/api/avail?q='+encodeURIComponent(q))).json();
+  box.innerHTML = hits.map(h=>'<div onclick="draftName(\''+h.name.replace(/'/g,"\\'")+'\')"><span>'+h.name+'</span><span style="color:var(--ink2)">'+h.pos+' '+(h.rank??'')+'</span></div>').join('');
+});
+async function tick(){
+  try {
+    const d = await (await fetch('live.json?_='+Date.now())).json();
+    lastUpdated = d.updated; lastFetch = Date.now();
+    lastData = d;
+    renderTeams(d);
+    isMock = d.mock;
+    document.getElementById('mockbar').style.display = 'flex';
+    document.getElementById('modelabel').textContent = d.mock ? 'MOCK MODE' : 'MANUAL BACKUP';
+    document.getElementById('undobtn').textContent = d.mock ? 'Undo my last pick' : 'Undo last mark';
+    document.getElementById('newmockbtn').style.display = d.mock ? '' : 'none';
+    document.getElementById('search').placeholder = d.mock ? 'Draft any player…' : 'Mark any player taken…';
+    document.getElementById('pickno').textContent = d.pick_no;
+    document.getElementById('round').textContent = d.round;
+    document.getElementById('until').textContent = d.picks_until_ours ?? '–';
+    document.getElementById('nextmine').textContent = d.next_mine ?? '–';
+    document.getElementById('updated').innerHTML = 'feed: '+d.updated +
+      ((d.gaps&&d.gaps.length) ? ' <span class="stale">('+d.gaps.length+' picks missing)</span>' : '');
+    const tb = document.getElementById('turnbar');
+    const u = d.picks_until_ours;
+    if (u === null || u === undefined) { tb.style.display = 'none'; }
+    else {
+      tb.style.display = 'block';
+      tb.className = u === 0 ? 'now' : u <= 3 ? 'soon' : '';
+      tb.textContent = u === 0 ? '▶ YOUR PICK — ON THE CLOCK'
+        : 'YOUR TURN IN ' + u + ' PICK' + (u === 1 ? '' : 'S') + '  (pick #' + d.next_mine + ')';
+    }
+    document.getElementById('needline').textContent =
+      Object.entries(d.my_counts).map(([p,c])=>p+':'+c).join('  ');
+    document.getElementById('recs').innerHTML = d.recs.map((r,i)=>{
+      const inj = r.injury;
+      const injTitle = inj ? [inj.body_part, inj.status, inj.updated].filter(Boolean).join(' · ') : '';
+      const injChip = inj ? '<span class="injchip" title="'+esc(injTitle)+'">'+esc(inj.chip||'?')+'</span>' : '';
+      const md = r.market_delta;
+      const roomChip = (md==null) ? '' :
+        '<span class="room '+(md>=15?'slide':md<=-15?'reach':'')+'" title="ESPN rank '+esc(r.espn_rank)+' · ADP '+esc(r.espn_adp)+' · UDK '+esc(r.rank)+(md>=15?' — room lets him slide':md<=-15?' — room takes him early':'')+'">ROOM '+(md>0?'+':'')+md+'</span>';
+      const why = r.why || [];
+      const withDelta = why.filter(f=>f.delta!=null);
+      const top4 = withDelta.slice().sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).slice(0,4);
+      const rest = why.filter(f=>top4.indexOf(f)===-1);
+      const waitLine = r.wait ? '<span class="wait">if you wait: '+esc(r.pos)+' → '+esc(r.wait.name)+' (~'+r.wait.proj+' pts)</span>' : '';
+      return '<div class="rec">'+
+      '<span class="i">'+(i+1)+'</span>'+
+      '<span class="pos '+r.pos+'">'+(r.pos==='DST'?'D':r.pos)+'</span>'+
+      '<span class="nm">'+r.name+injChip+roomChip+'<small>'+r.team+' · bye '+(r.bye??'–')+' · tier '+(r.tier??'–')+' · UDK '+(r.rank??'–')+'</small></span>'+
+      '<span class="meta">'+(r.adp?('ADP '+r.adp):'')+'</span>'+
+      '<span class="surv '+(r.surv<25?'gone':r.surv>60?'safe':'')+'">'+r.surv+'%</span>'+
+      '<span class="chips">'+r.tags.map(chip).join('')+' <button class="draftbtn" onclick="draftName(\''+r.name.replace(/'/g,"\\'")+'\')">'+(isMock?'DRAFT':'TAKEN')+'</button></span>'+
+      (r.notes.length?'<span class="note">✎ '+r.notes.join(' · ')+'</span>':'')+
+      waitLine+
+      '<span class="why-top">'+top4.map(factorSpan).join('')+
+        ((rest.length||r.outlook||r.profile)?'<span class="why-toggle" onclick="toggleWhy(this,'+i+')">▸ more</span>':'')+'</span>'+
+      (rest.length?'<div class="why-rest" id="whyrest-'+i+'" hidden>'+rest.map(factorSpan).join('')+'</div>':'')+
+      profBlock(r, i)+
+      '</div>';
+    }).join('');
+    document.getElementById('myroster').innerHTML =
+      d.my_roster.map(n=>'<span>'+n+'</span>').join('') || '<span>—</span>';
+    const runs = Object.entries(d.runs).sort((a,b)=>b[1]-a[1]);
+    document.getElementById('runs').innerHTML =
+      runs.map(([p,c])=>'<span class="pill '+(c>=4?'hot':'')+'">'+p+' × '+c+'</span>').join('') || '—';
+    document.getElementById('recent').innerHTML = d.recent.slice().reverse().map(p=>{
+      const tl = (d.team_labels||{})[p.team];
+      const who = tl ? tl.split(' · ')[0] : 'slot '+p.team;
+      return '<div class="row2"><span>#'+p.pick+' '+p.name+'</span><span class="who">'+who+'</span></div>';
+    }).join('');
+  } catch(e) {
+    const el = document.getElementById('updated');
+    if (Date.now()-lastFetch > 8000) el.innerHTML = '<span class="stale">feed stale</span>';
+  }
+}
+tick(); setInterval(tick, 2000);
+</script>
+</body>
+</html>
