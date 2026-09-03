@@ -1,0 +1,36 @@
+# Terms of art that mean nothing to a smart colleague who did not watch the
+# work. One word or phrase per line; matching is case-insensitive and whole-word.
+# A listed term only counts as a finding when no everyday explanation sits
+# within a few words after it ("like a...", "in other words...", a parenthetical).
+#
+# To add a term when the user says "too technical": (1) find the sentence,
+# (2) add its jargon here, (3) tighten prose_gate.py if the miss was structural,
+# (4) run `python3 tools/quality/prose_gate.py --check -` on the text and show
+# it now fails, (5) rewrite plainly and re-post. Never argue the miss.
+#
+# General engineering
+ratchet
+merge-base
+hunk
+pre-commit
+linter
+lint
+type checker
+frontmatter
+monkeypatch
+fixture
+idempotent
+refactor
+regression
+stdlib
+docstring
+annotation
+mypy
+ruff
+CI
+PR
+diff
+stash
+rebase
+subagent
+hook

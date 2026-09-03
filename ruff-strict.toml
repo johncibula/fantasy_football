@@ -1,0 +1,97 @@
+# Strict tier. Extends the base tier in pyproject.toml and turns on the house
+# rules from .claude/skills/shared-refs/code-style.md. It is NEVER run
+# repo-wide: tools/quality/gate_changed_lines.py runs it on the files you
+# touched and keeps only findings on lines you added or changed.
+#
+# Every ignore below carries a reason. An unexplained ignore is
+# indistinguishable from giving up.
+extend = "pyproject.toml"
+
+[lint]
+extend-select = [
+    "D",       # docstrings on every module, class, function
+    "ANN",     # full type annotations on every signature
+    "UP",      # modern syntax for the target version
+    "FBT",     # keyword-only booleans
+    "PTH",     # pathlib over open()/os.path
+    "BLE",     # no blind except
+    "B",       # bugbear: mutable defaults, raise-from, and friends
+    "TRY",     # exception hygiene: no vanilla raise args, no return in try
+    "EM",      # exception message in a named variable
+    "N",       # naming
+    "C90",     # complexity cap
+    "PL",      # pylint: branches, statements, args, magic values, globals
+    "ERA",     # no commented-out code
+    "T20",     # no print in library code
+    "DTZ",     # timezone-aware datetimes
+    "SIM",     # simplifications: with-statements, guard clauses
+    "RET",     # consistent returns
+    "ARG",     # unused arguments
+    "PIE",     # misc: unnecessary pass, duplicate class fields
+    "PGH",     # blanket noqa / type: ignore need a code
+    "RUF",     # ruff-specific, incl. unused noqa
+    "LOG",     # logging misuse
+    "G",       # logging format strings
+    "I",       # import order
+    "TID",     # absolute imports across packages; parent-relative imports break on every move
+    "PLC0415", # imports at the top of the file
+    # These two are ruff defaults that fantasy_football's base tier had to drop
+    # (E401 and F401/F841 are red on legacy); re-added here so changed lines are
+    # still held to them, matching the strict tier in the sibling repos.
+    "E4",      # one import per line
+    "F",       # pyflakes: undefined names, unused imports, unused variables
+]
+ignore = [
+    "D203",    # one-blank-line-before-class conflicts with D211; google style uses D211
+    "D212",    # multi-line-summary-first-line conflicts with D213; we accept either
+    "D213",    # see D212
+    "D200",    # a one-line docstring may sit on its own line; the formatter decides
+    "D400",    # summary need not end with a period; D415 is also off for the same reason
+    "D415",    # see D400
+    "E501",    # line length is the formatter's job; do not double-flag
+    "TRY003",  # long messages in raise are fine once EM has moved them to a variable
+    "PLR0913", # argument count is judged by the reviewer; PLR0917 (positional) still applies
+]
+
+[lint.per-file-ignores]
+# Literal expected values are the point of a test, not magic numbers (PLR2004);
+# a test's name states the property it proves, so a docstring would repeat it (D103).
+"**/tests/**" = ["PLR2004", "D103"]
+"**/test_*.py" = ["PLR2004", "D103"]
+# Quality-gate CLIs: their printed findings ARE the product, so print() is correct there.
+"tools/quality/*.py" = ["T201"]
+# --- fantasy_football-specific, measured at adoption ------------------------
+# Every module below is a hand-run command documented in README.md: stdout is
+# the user interface, not logging. src/draft_sim.py is deliberately absent --
+# it is a library of AI opponents and prints nothing, so it stays print-free,
+# and so does any new module added to src/ that is not listed here.
+"src/cheatsheet.py" = ["T201"]
+"src/daily_refresh.py" = ["T201"]
+"src/draft_board.py" = ["T201"]
+"src/draft_live.py" = ["T201"]
+"src/draft_tracker.py" = ["T201"]
+"src/espn_client.py" = ["T201"]
+"src/espn_sync.py" = ["T201"]
+"src/injuries.py" = ["T201"]
+"src/league_history.py" = ["T201"]
+"src/lookahead.py" = ["T201"]
+"src/market_feed.py" = ["T201"]
+"src/mock_server.py" = ["T201"]
+"src/mock_sync.py" = ["T201"]
+"src/player_pages.py" = ["T201"]
+"src/self_mock.py" = ["T201"]
+"src/udk_fetch.py" = ["T201"]
+# tests/__init__.py exists only to make tests/ a package for pytest; an empty
+# marker has nothing to document.
+"**/__init__.py" = ["D104", "F401"]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.pylint]
+max-branches = 12
+max-statements = 50
+max-positional-args = 5

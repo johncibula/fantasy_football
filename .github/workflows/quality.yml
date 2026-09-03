@@ -1,0 +1,28 @@
+# CI: the third place the gate lives. Runs the same make targets as the
+# PostToolUse hook and pre-commit so nobody can skip a gate by skipping a tool.
+name: quality
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the changed-lines gate needs the merge-base with main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"   # matches the local venv (3.13.13)
+      # This repo's venv is `venv/`, not `.venv/`; the Makefile and the gate both look there.
+      - run: python -m venv venv && venv/bin/pip install -q ruff==0.16.5 mypy pytest pre-commit
+      - run: venv/bin/pip install -q -r requirements.txt || true
+      - run: make lint
+      - run: make lint-strict
+      - run: make format-check
+      - run: venv/bin/python tools/quality/custom_checks.py --diff-base "$(git merge-base HEAD origin/main)"
+      - run: make skill-lint
+      - run: make typecheck
+      - run: make test
+      - run: venv/bin/pre-commit run --all-files --show-diff-on-failure

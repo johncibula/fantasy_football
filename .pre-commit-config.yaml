@@ -1,0 +1,75 @@
+# Pre-commit: the second of the three places the gate lives (the checked-in
+# PostToolUse hook catches agent edits first; CI catches anyone who skipped
+# this). Tool versions are pinned; hooks that run outside the project venv
+# carry their own dependency so they work on a fresh clone and in CI.
+#
+# Install once:  .venv/bin/pre-commit install
+# Everything:    .venv/bin/pre-commit run --all-files
+repos:
+  - repo: local
+    hooks:
+      # Base tier on the changed lines of the staged files. Line-scoped rather
+      # than file-scoped so touching one line of a legacy file does not force a
+      # bulk fix of that file; `make lint` still runs the whole repo where the
+      # legacy tree is base-clean.
+      - id: lint-base
+        name: base tier on changed lines
+        entry: python3 tools/quality/gate_changed_lines.py --base-tier
+        language: python
+        additional_dependencies: [ruff==0.16.5]
+        types: [python]
+      # Strict tier on the CHANGED LINES of the staged files. Its scope is
+      # deliberately wider than the base tier's rule set and narrower in
+      # lines: house rules apply to what you wrote, never to legacy.
+      - id: lint-strict
+        name: strict tier on changed lines
+        entry: python3 tools/quality/gate_changed_lines.py
+        language: python
+        additional_dependencies: [ruff==0.16.5]
+        types: [python]
+      - id: format-check
+        name: formatter on changed ranges
+        entry: python3 tools/quality/gate_changed_lines.py --format-check
+        language: python
+        additional_dependencies: [ruff==0.16.5]
+        types: [python]
+      # Added lines only, from the index: comment rules and forbidden constructs.
+      - id: custom-checks
+        name: comment rules and forbidden constructs
+        entry: python3 tools/quality/custom_checks.py --cached
+        language: python
+        types: [python]
+      # Whole tree on purpose: deleting a skill directory or moving a referenced
+      # file breaks a skill file that is not itself in the commit.
+      - id: skill-lint
+        name: skill and pointer-doc lint
+        entry: python3 tools/quality/skill_lint.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      # Commit messages go through the same plain-language gate as everything
+      # else outward; a keyed one-liner passes, identifier soup does not.
+      - id: prose-gate-commit-msg
+        name: plain-language gate on the commit message
+        entry: python3 tools/quality/prose_gate.py --check
+        language: python
+        stages: [commit-msg]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # These two REWRITE files rather than report on them. On --all-files they
+      # would strip whitespace across the whole legacy tree in one pass, which
+      # is exactly what the ratchet exists to prevent. Scoped to the quality
+      # tooling and the gate's own files; add a legacy directory here only
+      # after it has been cleaned on purpose.
+      - id: trailing-whitespace
+        files: ^(tools/quality/|docs/|\.claude/|\.github/|CLAUDE\.md|Makefile|ruff-strict\.toml|\.pre-commit-config\.yaml)
+      - id: end-of-file-fixer
+        files: ^(tools/quality/|docs/|\.claude/|\.github/|CLAUDE\.md|Makefile|ruff-strict\.toml|\.pre-commit-config\.yaml)
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=2000]
+      - id: check-merge-conflict
+      - id: detect-private-key

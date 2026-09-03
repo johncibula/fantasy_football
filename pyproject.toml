@@ -1,0 +1,43 @@
+[project]
+name = "fantasy-football"
+version = "0.1.0"
+description = "F3 league draft assistant — ESPN sync, tiered board, live draft advice"
+requires-python = ">=3.13"
+
+# Base tier — the floor for the whole repo, and it is green on the legacy tree
+# today (`make lint` runs `ruff check .`). The house rules live in
+# ruff-strict.toml and apply to changed lines only, so the floor stays at what
+# legacy already meets while everything written from today forward meets more.
+[tool.ruff]
+target-version = "py313"   # the venv is Python 3.13.13
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E402", "E7", "E9"]
+# Considered for the floor and dropped, because a floor that is red on legacy
+# gives the ratchet no baseline. Counts measured on src/ + tests/ at adoption.
+#   "E4"  -> only E402 kept. E401 (multiple imports on one line) is red 7 times:
+#            `import sys, pathlib` opens six test files and src/espn_sync.py.
+#   "F"   -> 10 findings: 9 F401 unused imports (src/draft_live.py,
+#            src/mock_server.py, src/league_history.py, src/draft_tracker.py,
+#            tests/test_injuries.py, tests/test_scoring.py) and 1 F841 unused
+#            variable in src/injuries.py.
+#   "I"   -> 20 I001 unsorted import blocks across src/ and tests/.
+#   "B"   -> 2 B905 zip() without an explicit strict= (src/self_mock.py,
+#            src/mock_server.py).
+#   "UP"  -> 10 findings: 9 UP017 datetime.timezone.utc, 1 UP031 printf-style
+#            formatting in src/draft_live.py.
+# I, B and UP are in ruff-strict.toml's extend-select already; E4 and F are
+# added there explicitly so changed lines are still held to all five.
+
+# Type checking ratchets up module by module: this is the loosest setting that
+# still catches real errors, and each package tightens as it is cleaned.
+[tool.mypy]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = false
+
+[tool.pytest.ini_options]
+# Two suites: the repo's own tests and the quality gate's tests. `make test`
+# runs both; the gate's suite must stay green wherever the kit is copied.
+testpaths = ["tests", "tools/quality/tests"]
