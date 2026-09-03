@@ -8,6 +8,57 @@
 # (4) run `python3 tools/quality/prose_gate.py --check -` on the text and show
 # it now fails, (5) rewrite plainly and re-post. Never argue the miss.
 #
+# --- fantasy_football vocabulary -------------------------------------------
+# Seeded from README.md, docs/plans/, and the module docstrings in src/.
+
+# How a recommendation is scored
+VBD
+VONA
+VOR
+rank-space
+replacement level
+survival odds
+best-available
+value over next available
+
+# Where the rankings and the market numbers come from
+UDK
+ADP
+FootClan
+market read
+kona
+mDraftDetail
+
+# League format and roster shape
+PPR
+FLEX
+D/ST
+DST
+FAAB
+snake draft
+
+# Simulated drafts and the practice harness
+lookahead
+rollout
+self-mock
+autopick
+tendencies
+dossier
+Monte Carlo
+
+# Labels the rankings put on a player
+sleeper
+breakout
+bust
+
+# Draft-night dashboard and the plan rails
+feed stale
+factor chips
+why list
+bye clash
+QB punt
+great-or-late
+
 # General engineering
 ratchet
 merge-base
