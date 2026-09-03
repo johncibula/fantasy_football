@@ -67,6 +67,7 @@ GIT_COMMIT = re.compile(r"\bgit\s+(?:-[-\w=]+\s+)*commit\b")
 COMMIT_FLAG_MESSAGE = re.compile(
     r"(?:^|\s)-(?:m|-message)(?:=|\s+)(?:\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'|(\S+))"
 )
+STDIN_MESSAGE = re.compile(r"(?:-F|--file)[= ]+(?:-(?!\S)|/dev/stdin)")
 HEREDOC = re.compile(
     r"<<-?\s*['\"]?(?P<tag>\w+)['\"]?\n(?P<body>.*?)\n\s*(?P=tag)\s*$", re.DOTALL | re.MULTILINE
 )
@@ -309,7 +310,7 @@ class Extractor:
             return None
         parts = ["".join(g for g in m.groups() if g) for m in COMMIT_FLAG_MESSAGE.finditer(command)]
         heredoc = HEREDOC.search(command)
-        if heredoc:
+        if heredoc and STDIN_MESSAGE.search(command):
             parts.append(heredoc.group("body"))
         return Extracted(channel="git-commit", texts=parts) if parts else None
 

@@ -9,6 +9,7 @@ extend = "pyproject.toml"
 
 [lint]
 extend-select = [
+    "E4", "E7", "E9", "F",  # syntax, imports, undefined names: strict must carry these even when a base tier had to drop them
     "D",       # docstrings on every module, class, function
     "ANN",     # full type annotations on every signature
     "UP",      # modern syntax for the target version
@@ -35,11 +36,6 @@ extend-select = [
     "I",       # import order
     "TID",     # absolute imports across packages; parent-relative imports break on every move
     "PLC0415", # imports at the top of the file
-    # These two are ruff defaults that fantasy_football's base tier had to drop
-    # (E401 and F401/F841 are red on legacy); re-added here so changed lines are
-    # still held to them, matching the strict tier in the sibling repos.
-    "E4",      # one import per line
-    "F",       # pyflakes: undefined names, unused imports, unused variables
 ]
 ignore = [
     "D203",    # one-blank-line-before-class conflicts with D211; google style uses D211

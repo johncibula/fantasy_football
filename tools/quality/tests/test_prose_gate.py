@@ -134,3 +134,10 @@ def test_commit_scope_prefix_and_trailers_are_not_prose(tmp_path: Path) -> None:
         "Co-Authored-By: Someone <someone@example.test>\n"
     )
     assert checker(tmp_path).check(text) == []
+
+
+def test_heredoc_that_is_not_the_commit_message_is_ignored() -> None:
+    command = "python3 - <<'EOF'\nprint('x')\nEOF\ngit commit -m \"short subject\""
+    extracted = Extractor.extract({"tool_name": "Bash", "tool_input": {"command": command}})
+    assert extracted is not None
+    assert extracted.texts == ["short subject"]
