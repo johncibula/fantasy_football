@@ -369,41 +369,5 @@
    "name": "Rico Dowdle"
   }
  ],
- "mock": true,
- "team_ids": [
-  2,
-  20,
-  14,
-  13,
-  12,
-  21,
-  4,
-  1,
-  6,
-  3,
-  9,
-  5,
-  7,
-  11,
-  15,
-  16
- ],
- "team_labels": {
-  "1": "Be Kind B*TcHeS \ud83d\udc46\ud83c\udffb\u270c\ud83c\udffb",
-  "2": "Crazy Rob",
-  "3": "Team Addi",
-  "4": "Fam Mimi",
-  "5": "Team De la cruz",
-  "6": "D1 Jamison Williams Glazer",
-  "7": "Team Cibula",
-  "8": "butt water",
-  "9": "Hagar Shores Pondrats",
-  "10": "De La  Chaos",
-  "11": "PawPaw Punchers",
-  "12": "Will is  A Beast",
-  "13": "Bob's got a hog",
-  "14": "The Local Two",
-  "15": "The Anti-Mitch",
-  "16": "The Come From Behinders"
- }
+ "mock": true
 }
