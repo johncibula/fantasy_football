@@ -263,6 +263,13 @@ def _room_pick(p: dict) -> float | None:
     return p.get("espn_adp")
 
 
+def source_labels(league: dict | None) -> dict[str, str]:
+    """Factor wording for the board in play: the owner's UDK board, or a visitor's own rankings."""
+    if league is None:
+        return {"rank_label": "UDK rank", "rank_short": "UDK", "market_label": "ESPN"}
+    return {"rank_label": "Your rank", "rank_short": "your rank", "market_label": "Market"}
+
+
 def league_config(state: dict) -> dict | None:
     """The league shape a generic draft state carries under "league".
 
@@ -379,6 +386,9 @@ class ScoreCtx:
     startable_qb_p_any: float = 1.0  # P(at least one of them survives) — variance-aware
     qb_targets_in_use: bool = True
     depths: dict = field(default_factory=replacement_depths)
+    rank_label: str = "UDK rank"
+    rank_short: str = "UDK"
+    market_label: str = "ESPN"
     _surv_cache: dict = field(default_factory=dict)
 
     def survival(self, p: dict) -> float:
@@ -447,12 +457,15 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
 
     # --- UDK rank (the backbone) ------------------------------------------
     if has_vbd:
-        add("UDK rank", RANK_WEIGHT * rank,
-            f"UDK #{p.get('overall_rank') or '—'} x {RANK_WEIGHT:.2f} (rank axis)")
+        add(
+            ctx.rank_label,
+            RANK_WEIGHT * rank,
+            f"{ctx.rank_short} #{p.get('overall_rank') or '—'} x {RANK_WEIGHT:.2f} (rank axis)",
+        )
     else:
         # K/DST have no projection baseline, so rank carries full weight and
         # the K/DST timing rules below stay calibrated exactly as before.
-        add("UDK rank", rank, f"{pos} — no VBD axis, rank carries full weight")
+        add(ctx.rank_label, rank, f"{pos} — no VBD axis, rank carries full weight")
 
     # --- Tags --------------------------------------------------------------
     tag_bonus = 0.0
@@ -520,13 +533,13 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
     md = p.get("market_delta")
     if md is not None:
         if md >= 15:
-            read = "room ranks him well below UDK — he should slide; safe to wait"
+            read = f"room ranks him well below {ctx.rank_short} — he should slide; safe to wait"
         elif md <= -15:
-            read = "room ranks him well above UDK — no waiting on him"
+            read = f"room ranks him well above {ctx.rank_short} — no waiting on him"
         else:
-            read = "room and UDK roughly agree"
+            read = f"room and {ctx.rank_short} roughly agree"
         add("Market", None,
-            f"ESPN #{p.get('espn_rank')} (ADP {p.get('espn_adp') or '—'}) vs UDK "
+            f"{ctx.market_label} #{p.get('espn_rank')} (ADP {p.get('espn_adp') or '—'}) vs {ctx.rank_short} "
             f"#{p.get('overall_rank')}: {md:+d} — {read}")
 
     # Take or wait: a player who will surely be there at our next pick is a wasted pick now,
@@ -802,6 +815,7 @@ def build_live(state: dict, board: dict) -> dict:
             startable_qbs_left=startable_qbs_left, startable_qb_exp=startable_qb_exp,
             startable_qb_p_any=startable_qb_p_any,
             qb_targets_in_use=qb_targets_in_use, depths=replacement_depths(league),
+            **source_labels(league),
         )
 
         candidates = best_available(state, board, limit=40)
