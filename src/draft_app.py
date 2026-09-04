@@ -26,8 +26,6 @@ from draft_tracker import norm_name
 from rankings_import import ImportedBoard, RankingsFormatError, RankingsImporter, template_csv
 
 SAMPLE_PATH = Path(__file__).resolve().parent.parent / "samples" / "sample_rankings.csv"
-SAMPLE_ADP_TEAMS = 10
-DEFAULT_ADP_TEAMS = 12
 SOURCE_SAMPLE = "Sample: ESPN default rankings"
 SOURCE_UPLOAD = "Upload my own CSV"
 MODE_MOCK = "Mock draft against AI opponents"
@@ -127,8 +125,8 @@ under a name sum exactly to that score. Hover a chip for the reason.
 | **Tags** | Your own scouting from a Tags column: `target`/`value`, `sleeper`, `breakout`, `watch`, `bust`/`avoid`. |
 
 ### The room
-The other seats are bots drafting off the **market**: your ADP column, rescaled to this league,
-weighted by each team's needs, with sampling noise so runs and reaches happen. Before each of
+The other seats are bots drafting off the **market**: your ADP column, taken as the order the
+room drafts in, weighted by each team's needs, with sampling noise so runs and reaches happen. Before each of
 your picks the engine replays the picks between your turns **over a hundred times** and counts who
 survives and who the best leftover at each position tends to be. That is where the survival
 odds, the VONA numbers, and the "if he's gone, best next turn" lines come from.
@@ -153,7 +151,7 @@ Only **Name** and **Pos** are required; rows are taken in rank order if there is
 
 - **Pos** accepts `RB`, `RB12` (the number becomes the position rank), `DEF`/`D/ST`/`DST`, `PK`.
 - **Proj** is projected season points and unlocks value over replacement and value over next available.
-- **ADP** is an overall pick number from an N-team draft; set N in the sidebar and it is rescaled to your league.
+- **ADP** is an overall pick number (7.7 means the eighth player off the board). It is used as the room's order in any league size.
 - **Tags**: `target`, `sleeper`, `breakout`, `watch`, `bust` (or `avoid`), separated by commas.
 - Common FantasyPros headers (RK, PLAYER NAME, TEAM, POS, BYE WEEK, AVG) are recognised.
 """
@@ -272,12 +270,6 @@ class DraftApp:
             source = st.radio("Rankings", [SOURCE_SAMPLE, SOURCE_UPLOAD], key="source")
             if source == SOURCE_UPLOAD:
                 st.file_uploader("Rankings CSV", type=["csv"], key="upload")
-            st.number_input(
-                "ADP column is from an N-team draft",
-                *TEAM_RANGE,
-                key="adp_teams",
-                value=SAMPLE_ADP_TEAMS if source == SOURCE_SAMPLE else DEFAULT_ADP_TEAMS,
-            )
             st.divider()
             teams = st.number_input("Teams", *TEAM_RANGE, value=DEFAULT_TEAMS, key="teams")
             st.number_input("Rounds", *ROUND_RANGE, value=DEFAULT_ROUNDS, key="rounds")
@@ -324,10 +316,7 @@ class DraftApp:
             data = upload.getvalue()
         else:
             data = SAMPLE_PATH.read_bytes()
-        importer = RankingsImporter(
-            teams=int(self.state.teams), adp_teams=int(self.state.adp_teams)
-        )
-        return importer.from_bytes(data)
+        return RankingsImporter(teams=int(self.state.teams)).from_bytes(data)
 
     def _reset(self) -> None:
         self.state.session = None

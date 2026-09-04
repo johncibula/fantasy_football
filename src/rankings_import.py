@@ -10,10 +10,11 @@ Kickers and defences keep only their position rank, as on the owner's board:
 the engine injects them itself when the roster must be filled, and a ranked
 defence would otherwise re-enter the candidate list under its aliases.
 
-ADP in the CSV is an overall pick number from an `adp_teams` draft. It is
-rescaled to the league being drafted and stored where the bots and the
-survival model already read the market (`espn_adp`, `espn_rank`), so the room
-in a mock drafts off the visitor's market, not the owner's.
+ADP in the CSV is an overall pick number and is used as is, whatever size of
+draft it came from: the eighth player off the board goes eighth in any league.
+It is stored where the bots and the survival model already read the market
+(`espn_adp`, `espn_rank`), so the room in a mock drafts off the visitor's
+market, not the owner's.
 """
 
 from __future__ import annotations
@@ -62,7 +63,6 @@ TAG_ALIASES = {
 FLEX_POSITIONS = ("RB", "WR", "TE")
 UNRANKED_POSITIONS = ("K", "DST")
 DRAFTABLE_WINDOW = 240
-DEFAULT_ADP_TEAMS = 12
 TEMPLATE_HEADER = "Rank,Name,Pos,Team,Bye,Tier,Proj,ADP,Tags"
 
 NFL_TEAMS = {
@@ -228,10 +228,9 @@ def _parse_tags(text: str | None) -> list[str]:
 class RankingsImporter:
     """Read a rankings CSV into the engine's board for one league size."""
 
-    def __init__(self, teams: int, adp_teams: int = DEFAULT_ADP_TEAMS) -> None:
-        """Remember the league size and the size of the draft the ADP column came from."""
+    def __init__(self, teams: int) -> None:
+        """Remember the league size the board is being built for."""
         self.teams = teams
-        self.adp_teams = adp_teams
 
     def from_bytes(self, data: bytes) -> ImportedBoard:
         """Decode an uploaded file (UTF-8 with or without a BOM, else Latin-1) and import it."""
@@ -347,16 +346,14 @@ class RankingsImporter:
                 flex += 1
                 p["flex_rank"] = flex
 
-    def _assign_market(self, players: list[dict]) -> None:
-        scale = self.teams / self.adp_teams
+    @staticmethod
+    def _assign_market(players: list[dict]) -> None:
         by_market = sorted(
             players,
             key=lambda p: (p["espn_adp"] is None, p["espn_adp"] or 0, p["overall_rank"] or 0),
         )
         for room_rank, p in enumerate(by_market, start=1):
             p["espn_rank"] = room_rank
-            if p["espn_adp"] is not None:
-                p["espn_adp"] = round(p["espn_adp"] * scale, 1)
             rank = p["overall_rank"]
             in_window = rank is not None and (
                 rank <= DRAFTABLE_WINDOW or room_rank <= DRAFTABLE_WINDOW

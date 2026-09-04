@@ -40,13 +40,13 @@ def test_minimal_csv_ranks_by_row_order_and_assigns_position_ranks() -> None:
     assert board.report.unlocked() == ["rankings", "survival odds", "AI opponents"]
 
 
-def test_fantasypros_headers_are_recognised_and_adp_is_rescaled() -> None:
-    board = RankingsImporter(teams=16, adp_teams=12).from_text(FANTASYPROS)
+def test_fantasypros_headers_are_recognised_and_adp_is_kept_as_is() -> None:
+    board = RankingsImporter(teams=16).from_text(FANTASYPROS)
     alpha, bravo, charlie = board.players
     assert board.columns["adp"] == "AVG"
     assert alpha["pos_rank"] == 1 and charlie["pos_rank"] == 2
     assert alpha["team"] == "DET" and alpha["bye"] == 6
-    assert alpha["espn_adp"] == 2.0 and bravo["espn_adp"] == 4.0
+    assert alpha["espn_adp"] == 1.5 and bravo["espn_adp"] == 3.0
     assert charlie["espn_adp"] is None and charlie["espn_rank"] == 3
     assert board.report.has_adp and board.report.has_bye and not board.report.has_projections
 
@@ -71,7 +71,7 @@ def test_tags_are_normalised_to_the_engine_vocabulary() -> None:
 
 
 def test_market_delta_compares_room_rank_with_your_rank() -> None:
-    board = RankingsImporter(teams=12, adp_teams=12).from_text(FULL)
+    board = RankingsImporter(teams=12).from_text(FULL)
     assert board.index["echo arm"]["market_delta"] == 0
     assert board.index["houston texans"]["market_delta"] is None
 

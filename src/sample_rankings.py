@@ -7,7 +7,7 @@ are read. Regenerate before showing the app so the sample is current:
 
   ./venv/bin/python src/sample_rankings.py [--top 300] [--year 2026]
 
-ESPN's ADP comes from its 10-team drafts, so the app scales it from 10 teams.
+ESPN's ADP is an overall pick number from its own drafts and is used as is.
 """
 
 from __future__ import annotations
@@ -30,7 +30,6 @@ TEAMS_URL = (
 )
 SAMPLE_PATH = Path(__file__).resolve().parent.parent / "samples" / "sample_rankings.csv"
 POSITIONS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DST"}
-ADP_TEAMS = 10
 UNDRAFTED_ADP = 169.5
 PROJECTION_SOURCE = 1
 SEASON_TOTAL_PERIOD = 0

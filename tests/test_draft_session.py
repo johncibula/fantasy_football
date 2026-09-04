@@ -35,7 +35,7 @@ def synthetic_csv() -> str:
     return "\n".join(rows) + "\n"
 
 
-BOARD = RankingsImporter(teams=10, adp_teams=10).from_text(synthetic_csv()).index
+BOARD = RankingsImporter(teams=10).from_text(synthetic_csv()).index
 
 
 def legal(session: DraftSession, seat: int) -> bool:
