@@ -151,7 +151,7 @@ Only **Name** and **Pos** are required; rows are taken in rank order if there is
 
 - **Pos** accepts `RB`, `RB12` (the number becomes the position rank), `DEF`/`D/ST`/`DST`, `PK`.
 - **Proj** is projected season points and unlocks value over replacement and value over next available.
-- **ADP** is an overall pick number (7.7 means the eighth player off the board). It is used as the room's order in any league size.
+- **ADP** is an overall pick number, never round.pick: 7.7 means he goes 8th on average, and 1.08 would mean the second pick. It is used as the room's order in any league size.
 - **Tags**: `target`, `sleeper`, `breakout`, `watch`, `bust` (or `avoid`), separated by commas.
 - Common FantasyPros headers (RK, PLAYER NAME, TEAM, POS, BYE WEEK, AVG) are recognised.
 """
@@ -420,7 +420,7 @@ class DraftApp:
             cols[1].markdown(pos_chip(rec["pos"]), unsafe_allow_html=True)
             cols[2].markdown(rec_name_html(rec), unsafe_allow_html=True)
             cols[3].markdown(
-                f'<span class="meta">{"ADP " + esc(rec["adp"]) if rec.get("adp") else ""}</span>',
+                f'<span class="meta">{"avg pick " + esc(rec["adp"]) if rec.get("adp") else ""}</span>',
                 unsafe_allow_html=True,
             )
             cols[4].markdown(surv_html(rec["surv"]), unsafe_allow_html=True)
