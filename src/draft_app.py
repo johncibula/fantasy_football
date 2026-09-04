@@ -129,9 +129,14 @@ under a name sum exactly to that score. Hover a chip for the reason.
 ### The room
 The other seats are bots drafting off the **market**: your ADP column, rescaled to this league,
 weighted by each team's needs, with sampling noise so runs and reaches happen. Before each of
-your picks the engine replays the picks between your turns **150 times** and counts who
+your picks the engine replays the picks between your turns **over a hundred times** and counts who
 survives and who the best leftover at each position tends to be. That is where the survival
 odds, the VONA numbers, and the "if he's gone, best next turn" lines come from.
+
+### The plan
+The side panel plans your next few picks, not just this one. Each future pick is scored with
+the roster as it will stand by then and the odds at that pick, so it names who to take now
+because he will not last, and who to wait on because he will.
 
 ### Two modes
 **Mock draft**: practise against the bots from any seat. **Assist my live draft**: mark players
@@ -472,6 +477,16 @@ class DraftApp:
 
     @staticmethod
     def _side_panels(live: dict) -> None:
+        queue = live.get("queue") or []
+        if queue:
+            st.subheader("Plan for your next picks")
+            for slot in queue:
+                st.markdown(
+                    f'<span class="meta">#{slot["pick"]} (R{slot["round"]})</span> '
+                    f"{pos_chip(slot['pos'])} <b>{esc(slot['name'])}</b> "
+                    f'<span class="meta">· {esc(slot["reason"])}</span>',
+                    unsafe_allow_html=True,
+                )
         st.subheader("My roster")
         roster = "".join(f"<span>{esc(n)}</span>" for n in live["my_roster"]) or "<span>—</span>"
         st.markdown(f'<div class="roster">{roster}</div>', unsafe_allow_html=True)

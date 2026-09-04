@@ -29,6 +29,7 @@ import espn_client
 import draft_tracker as dt
 import injuries
 import league_history
+import draft_queue
 import lookahead
 import player_pages
 from draft_tracker import (DATA, STATE_PATH, load_board, load_state, save_state,
@@ -43,7 +44,7 @@ API = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/se
 # Monte-Carlo rollout size for the per-call lookahead. 150 keeps a `--once`
 # rebuild on an early-draft state well under the 1.2s budget (see the plan-05
 # report); the self-play harness lowers it to FAST_ROLLOUT_N via --fast.
-ROLLOUT_N = int(os.environ.get("DRAFT_ROLLOUT_N", "150"))
+ROLLOUT_N = int(os.environ.get("DRAFT_ROLLOUT_N", "120"))
 FAST_ROLLOUT_N = 40
 # None = fresh sampling noise every call (the live default). The harness and
 # the tests pin it so their output is reproducible.
@@ -70,7 +71,11 @@ VBD_WEIGHT = 0.4
 STARTABLE_QB = 16
 RB_DEPTH_TARGET = 5
 RB_DEPTH_PUSH = 12.0  # rank points per missing RB from round 5 on (was 8: never actually reached 5)
-PAIR_GAP = 8  # picks between our two picks for "pair plan" logic to apply
+CAN_WAIT = 0.75  # survival to our next pick above which "take who won't last" applies
+NOW_OR_NEVER = 0.35  # ...and below which he is now-or-never
+WAIT_PUSH = 6.0  # rank points moved either way
+QUEUE_POOL = 140  # best-available depth the multi-pick queue plans from
+QUEUE_ENABLED = os.environ.get("DRAFT_QUEUE", "1") != "0"   # self-play turns it off for speed
 PAIR_SURV_SAFE = 0.7  # he will still be there at the very next pick: take the other one first
 PAIR_SURV_GONE = 0.35  # he will not: now or never
 RB_DEPTH_FROM_ROUND = 5
@@ -524,24 +529,24 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
             f"ESPN #{p.get('espn_rank')} (ADP {p.get('espn_adp') or '—'}) vs UDK "
             f"#{p.get('overall_rank')}: {md:+d} — {read}")
 
-    # Pair plan: with two picks only a few selections apart, survival is near-certain,
-    # so the question becomes which of the two you lose by waiting.
+    # Take or wait: a player who will surely be there at our next pick is a wasted pick now,
+    # so take the one who won't be and get this one next turn; the reverse when now-or-never.
     gap = (
         (ctx.after - ctx.pick_no) if ctx.next_mine == ctx.pick_no else (ctx.next_mine - ctx.pick_no)
     )
-    if pos in ("QB", "RB", "WR", "TE") and 1 < gap <= PAIR_GAP:
-        if surv >= PAIR_SURV_SAFE:
-            delta = round(6.0 * (surv - 0.5) / 0.5, 1)
+    if pos in ("QB", "RB", "WR", "TE") and gap > 1:
+        if surv >= CAN_WAIT:
+            delta = round(WAIT_PUSH * (surv - 0.5) / 0.5, 1)
             add(
-                "Pair plan",
+                "Take/wait",
                 delta,
-                f"{surv:.0%} likely there at your very next pick (#{ctx.surv_end}) — take who won't be",
+                f"{surv:.0%} likely there at your next pick (#{ctx.surv_end}) — take who won't be, get him then",
             )
-        elif surv <= PAIR_SURV_GONE:
+        elif surv <= NOW_OR_NEVER:
             add(
-                "Pair plan",
-                -6.0,
-                f"only {surv:.0%} likely there at your very next pick (#{ctx.surv_end}) — now or never",
+                "Take/wait",
+                -WAIT_PUSH,
+                f"only {surv:.0%} likely there at your next pick (#{ctx.surv_end}) — now or never",
             )
 
     # --- Survival (context only) -------------------------------------------
@@ -713,15 +718,26 @@ def build_live(state: dict, board: dict) -> dict:
                       or f"slot {s}"}
 
     # One Monte-Carlo rollout per call feeds survival, VONA and "if you wait".
-    look = {"n": 0, "next_mine": next_mine, "after": after, "survival": {},
-            "survival_after": {}, "next_best": {}, "elapsed_ms": 0.0}
+    look = {
+        "n": 0,
+        "next_mine": next_mine,
+        "after": after,
+        "my_future": [],
+        "survival": {},
+        "survival_after": {},
+        "next_best": {},
+        "survival_at": {},
+        "next_best_at": {},
+        "elapsed_ms": 0.0,
+    }
     if next_mine:
         look = lookahead.rollout(state, board, n=ROLLOUT_N, seed=ROLLOUT_SEED,
-                                 pos_bias_by_slot=bias)
+                                 pos_bias_by_slot=bias, horizon_picks=draft_queue.QUEUE_LEN)
 
     inj = injuries.load().get("players", {})
 
     recs = []
+    queue: list[dict] = []
     tagged_qbs_left = 0
     qb_exp_surv = 0.0
     qb_targets_in_use = True
@@ -830,10 +846,19 @@ def build_live(state: dict, board: dict) -> dict:
                          if nb else None),
                 "espn_rank": p.get("espn_rank"), "espn_adp": p.get("espn_adp"),
                 "market_delta": p.get("market_delta"),
+                "proj": p.get("proj_points"), "vbd": round(vbd_of(p, ctx.baselines), 1),
                 "outlook": p.get("outlook"),
                 "profile": player_pages.profile_for(p["name"]),
             })
         recs.sort(key=lambda r: r["score"])
+        if QUEUE_ENABLED:
+            queue = draft_queue.build_queue(
+                ctx,
+                look,
+                best_available(state, board, limit=QUEUE_POOL),
+                score_candidate,
+                current_pick_is_ours=(next_mine == pick_no),
+            )
 
     # Position-run detector: last 8 picks by position.
     last8 = state["picks"][-8:]
@@ -936,6 +961,7 @@ def build_live(state: dict, board: dict) -> dict:
             pos: {k: v for k, v in nb.items() if k != "runs"}
             for pos, nb in look.get("next_best", {}).items()
         },
+        "queue": [{k: v for k, v in q.items() if k != "why"} for q in queue],
         "qb_watch": {
             "have": my_counts.get("QB", 0),
             "startable_left": startable_qbs_left,

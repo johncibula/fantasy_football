@@ -1,0 +1,409 @@
+{
+ "teams": 16,
+ "slot": 10,
+ "rounds": 15,
+ "picks": [
+  {
+   "pick": 1,
+   "team": 1,
+   "name": "Bijan Robinson"
+  },
+  {
+   "pick": 2,
+   "team": 2,
+   "name": "Jahmyr Gibbs"
+  },
+  {
+   "pick": 3,
+   "team": 3,
+   "name": "Jonathan Taylor"
+  },
+  {
+   "pick": 4,
+   "team": 4,
+   "name": "Ja'Marr Chase"
+  },
+  {
+   "pick": 5,
+   "team": 5,
+   "name": "Puka Nacua"
+  },
+  {
+   "pick": 6,
+   "team": 6,
+   "name": "Amon-Ra St. Brown"
+  },
+  {
+   "pick": 7,
+   "team": 7,
+   "name": "Jaxon Smith-Njigba"
+  },
+  {
+   "pick": 8,
+   "team": 8,
+   "name": "James Cook III"
+  },
+  {
+   "pick": 9,
+   "team": 9,
+   "name": "Drake London"
+  },
+  {
+   "pick": 10,
+   "team": 10,
+   "name": "Christian McCaffrey"
+  },
+  {
+   "pick": 11,
+   "team": 11,
+   "name": "Chase Brown"
+  },
+  {
+   "pick": 12,
+   "team": 12,
+   "name": "CeeDee Lamb"
+  },
+  {
+   "pick": 13,
+   "team": 13,
+   "name": "Saquon Barkley"
+  },
+  {
+   "pick": 14,
+   "team": 14,
+   "name": "Trey McBride"
+  },
+  {
+   "pick": 15,
+   "team": 15,
+   "name": "Derrick Henry"
+  },
+  {
+   "pick": 16,
+   "team": 16,
+   "name": "De'Von Achane"
+  },
+  {
+   "pick": 17,
+   "team": 16,
+   "name": "Ashton Jeanty"
+  },
+  {
+   "pick": 18,
+   "team": 15,
+   "name": "Josh Allen"
+  },
+  {
+   "pick": 19,
+   "team": 14,
+   "name": "Omarion Hampton"
+  },
+  {
+   "pick": 20,
+   "team": 13,
+   "name": "Justin Jefferson"
+  },
+  {
+   "pick": 21,
+   "team": 12,
+   "name": "Jeremiyah Love"
+  },
+  {
+   "pick": 22,
+   "team": 11,
+   "name": "Nico Collins"
+  },
+  {
+   "pick": 23,
+   "team": 10,
+   "name": "Kenneth Walker"
+  },
+  {
+   "pick": 24,
+   "team": 9,
+   "name": "A.J. Brown"
+  },
+  {
+   "pick": 25,
+   "team": 8,
+   "name": "DeVonta Smith"
+  },
+  {
+   "pick": 26,
+   "team": 7,
+   "name": "Chris Olave"
+  },
+  {
+   "pick": 27,
+   "team": 6,
+   "name": "Brock Bowers"
+  },
+  {
+   "pick": 28,
+   "team": 5,
+   "name": "Rashee Rice"
+  },
+  {
+   "pick": 29,
+   "team": 4,
+   "name": "George Pickens"
+  },
+  {
+   "pick": 30,
+   "team": 3,
+   "name": "Malik Nabers"
+  },
+  {
+   "pick": 31,
+   "team": 2,
+   "name": "Tetairoa McMillan"
+  },
+  {
+   "pick": 32,
+   "team": 1,
+   "name": "Lamar Jackson"
+  },
+  {
+   "pick": 33,
+   "team": 1,
+   "name": "Javonte Williams"
+  },
+  {
+   "pick": 34,
+   "team": 2,
+   "name": "Cam Skattebo"
+  },
+  {
+   "pick": 35,
+   "team": 3,
+   "name": "Emeka Egbuka"
+  },
+  {
+   "pick": 36,
+   "team": 4,
+   "name": "Zay Flowers"
+  },
+  {
+   "pick": 37,
+   "team": 5,
+   "name": "Ladd McConkey"
+  },
+  {
+   "pick": 38,
+   "team": 6,
+   "name": "Colston Loveland"
+  },
+  {
+   "pick": 39,
+   "team": 7,
+   "name": "Tee Higgins"
+  },
+  {
+   "pick": 40,
+   "team": 8,
+   "name": "Kyren Williams"
+  },
+  {
+   "pick": 41,
+   "team": 9,
+   "name": "Breece Hall"
+  },
+  {
+   "pick": 42,
+   "team": 10,
+   "name": "Garrett Wilson"
+  },
+  {
+   "pick": 43,
+   "team": 11,
+   "name": "Davante Adams"
+  },
+  {
+   "pick": 44,
+   "team": 12,
+   "name": "Bhayshul Tuten"
+  },
+  {
+   "pick": 45,
+   "team": 13,
+   "name": "Travis Etienne Jr."
+  },
+  {
+   "pick": 46,
+   "team": 14,
+   "name": "Drake Maye"
+  },
+  {
+   "pick": 47,
+   "team": 15,
+   "name": "D'Andre Swift"
+  },
+  {
+   "pick": 48,
+   "team": 16,
+   "name": "Quinshon Judkins"
+  },
+  {
+   "pick": 49,
+   "team": 16,
+   "name": "Jaylen Waddle"
+  },
+  {
+   "pick": 50,
+   "team": 15,
+   "name": "Jadarian Price"
+  },
+  {
+   "pick": 51,
+   "team": 14,
+   "name": "Bucky Irving"
+  },
+  {
+   "pick": 52,
+   "team": 13,
+   "name": "Jalen Hurts"
+  },
+  {
+   "pick": 53,
+   "team": 12,
+   "name": "Joe Burrow"
+  },
+  {
+   "pick": 54,
+   "team": 11,
+   "name": "Kyle Pitts Sr."
+  },
+  {
+   "pick": 55,
+   "team": 10,
+   "name": "Carnell Tate"
+  },
+  {
+   "pick": 56,
+   "team": 9,
+   "name": "Tyler Warren"
+  },
+  {
+   "pick": 57,
+   "team": 8,
+   "name": "David Montgomery"
+  },
+  {
+   "pick": 58,
+   "team": 7,
+   "name": "Jayden Daniels"
+  },
+  {
+   "pick": 59,
+   "team": 6,
+   "name": "DJ Moore"
+  },
+  {
+   "pick": 60,
+   "team": 5,
+   "name": "Rome Odunze"
+  },
+  {
+   "pick": 61,
+   "team": 4,
+   "name": "Jameson Williams"
+  },
+  {
+   "pick": 62,
+   "team": 3,
+   "name": "Dak Prescott"
+  },
+  {
+   "pick": 63,
+   "team": 2,
+   "name": "Terry McLaurin"
+  },
+  {
+   "pick": 64,
+   "team": 1,
+   "name": "Sam LaPorta"
+  },
+  {
+   "pick": 65,
+   "team": 1,
+   "name": "DK Metcalf"
+  },
+  {
+   "pick": 66,
+   "team": 2,
+   "name": "Harold Fannin Jr."
+  },
+  {
+   "pick": 67,
+   "team": 3,
+   "name": "TreVeyon Henderson"
+  },
+  {
+   "pick": 68,
+   "team": 4,
+   "name": "George Kittle"
+  },
+  {
+   "pick": 69,
+   "team": 5,
+   "name": "Courtland Sutton"
+  },
+  {
+   "pick": 70,
+   "team": 6,
+   "name": "Josh Jacobs"
+  },
+  {
+   "pick": 71,
+   "team": 7,
+   "name": "Marvin Harrison Jr."
+  },
+  {
+   "pick": 72,
+   "team": 8,
+   "name": "Caleb Williams"
+  },
+  {
+   "pick": 73,
+   "team": 9,
+   "name": "Rico Dowdle"
+  }
+ ],
+ "mock": true,
+ "team_ids": [
+  2,
+  20,
+  14,
+  13,
+  12,
+  21,
+  4,
+  1,
+  6,
+  3,
+  9,
+  5,
+  7,
+  11,
+  15,
+  16
+ ],
+ "team_labels": {
+  "1": "Be Kind B*TcHeS \ud83d\udc46\ud83c\udffb\u270c\ud83c\udffb",
+  "2": "Crazy Rob",
+  "3": "Team Addi",
+  "4": "Fam Mimi",
+  "5": "Team De la cruz",
+  "6": "D1 Jamison Williams Glazer",
+  "7": "Team Cibula",
+  "8": "butt water",
+  "9": "Hagar Shores Pondrats",
+  "10": "De La  Chaos",
+  "11": "PawPaw Punchers",
+  "12": "Will is  A Beast",
+  "13": "Bob's got a hog",
+  "14": "The Local Two",
+  "15": "The Anti-Mitch",
+  "16": "The Come From Behinders"
+ }
+}

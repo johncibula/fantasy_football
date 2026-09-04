@@ -19,7 +19,7 @@ _LEAGUE_BIAS: dict = {}
 KDST_ROUNDS_WINDOW = 9  # bots consider K/DST only with this many rounds left (F3: first DST ~R10.5)
 KDST_RAMP_BASE = 0.08  # K/DST weight = base * (rounds into the window)^2; ~1.0 = top market player
 SECOND_QB_TE_ROUNDS = 9  # a 2nd QB/TE is a late-round luxury until this many rounds remain
-SECOND_QB_TE_DAMP = 0.5
+SECOND_QB_TE_DAMP = 0.35
 
 
 def league_bias() -> dict[str, float]:

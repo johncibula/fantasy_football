@@ -1,6 +1,8 @@
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
+import json
+
 import pytest
 
 import draft_live as dl
@@ -245,3 +247,23 @@ def test_injury_good_news_word_order() -> None:
             },
         )
         assert pen == 2.0, headline
+
+
+# --- (g) take who won't last, at any gap ------------------------------------
+
+
+def test_now_or_never_beats_sure_thing_of_equal_value() -> None:
+    """A sure thing of equal value must rank below the player who will not last.
+
+    Live mock, slot 10, pick 74 (next pick 87): Lloyd and Stevenson are a coin
+    flip on value (UDK 68/69, ~190 proj each) but Lloyd is ~100% there at 87
+    and Stevenson ~0%. The board must put Stevenson first so we get both.
+    """
+    state = json.loads(
+        (pathlib.Path(__file__).parent / "fixtures" / "state_slot10_pick74.json").read_text()
+    )
+    dl.ROLLOUT_N, dl.ROLLOUT_SEED = 60, 1
+    live = dl.build_live(state, BOARD)
+    names = [r["name"] for r in live["recs"]]
+    assert names.index("Rhamondre Stevenson") < names.index("MarShawn Lloyd")
+    assert live["queue"][0]["name"] == live["recs"][0]["name"]

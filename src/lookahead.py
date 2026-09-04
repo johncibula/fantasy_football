@@ -36,49 +36,71 @@ def _pos_rank_key(p: dict) -> float:
     return p.get("overall_rank") or p.get("flex_rank") or p.get("pos_rank") or 999
 
 
+def _future_picks(state: dict, horizon_picks: int) -> tuple[list[int], int]:
+    """Our next `horizon_picks` picks to simulate to, and the pick the bots start at.
+
+    On the clock, the current pick is ours to make and is not simulated: the
+    horizon starts at the FOLLOWING pick ("if I pass on him now, is he there
+    next round"). Between turns it starts at our upcoming pick.
+    """
+    teams, slot, rounds = state["teams"], state["slot"], state["rounds"]
+    pick_no = len(state["picks"]) + 1
+    total = teams * rounds
+    on_clock = pick_no <= total and dt.snake_team_for_pick(pick_no, teams) == slot
+    upcoming = [p for p in dt.my_pick_numbers(slot, teams, rounds) if p >= pick_no]
+    future = upcoming[1:] if on_clock else upcoming
+    return future[:horizon_picks], (pick_no + 1 if on_clock else pick_no)
+
+
+def _standin_pick(standin_pool: list[dict], gone: set, counts: dict) -> dict | None:
+    """Our own stand-in pick inside a simulation.
+
+    Best available by rank that doesn't stack a 2nd QB/TE (K/DST are excluded
+    from the pool already).
+    """
+    for p in standin_pool:
+        if dt.norm_name(p["name"]) in gone:
+            continue
+        if p["pos"] in ("QB", "TE") and counts.get(p["pos"], 0) >= 1:
+            continue
+        return p
+    return None
+
+
 def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
             pos_bias_by_slot: dict[int, dict[str, float]] | None = None,
             horizon_picks: int = 2) -> dict:
+    """Simulate the room to each of our next `horizon_picks` picks, n times.
+
+    Returns survival odds and the likely best player per position at EACH of
+    those picks (`survival_at` / `next_best_at`, keyed by pick number), plus
+    the two-pick fields older callers use: `survival` (first future pick),
+    `survival_after` (second), `next_best`, `next_mine`, `after`.
+    """
     t0 = time.time()
     teams, slot, rounds = state["teams"], state["slot"], state["rounds"]
-    pick_no = len(state["picks"]) + 1
     total_slots = teams * rounds
-    on_clock = dt.snake_team_for_pick(pick_no, teams) == slot if pick_no <= total_slots else False
+    future, bot_start = _future_picks(state, horizon_picks)
+    next_mine = future[0] if future else None
+    after = future[1] if len(future) > 1 else None
 
-    mine = dt.my_pick_numbers(slot, teams, rounds)
-    upcoming = [p for p in mine if p >= pick_no]
-
-    if on_clock:
-        # "If I pass on him now, is he there next round" — our current pick
-        # (pick_no) is not simulated at all; next_mine is the FOLLOWING one.
-        next_mine = upcoming[1] if len(upcoming) > 1 else None
-        bot_start = pick_no + 1
-    else:
-        next_mine = upcoming[0] if upcoming else None
-        bot_start = pick_no
-
-    after = None
-    if next_mine is not None and horizon_picks >= 2:
-        idx = mine.index(next_mine)
-        after = mine[idx + 1] if idx + 1 < len(mine) else None
-
-    empty_result = {
-        "n": n, "next_mine": next_mine, "after": after,
-        "survival": {}, "survival_after": {}, "next_best": {},
-        "elapsed_ms": (time.time() - t0) * 1000,
+    result = {
+        "n": n,
+        "next_mine": next_mine,
+        "after": after,
+        "my_future": future,
+        "survival": {},
+        "survival_after": {},
+        "next_best": {},
+        "survival_at": {},
+        "next_best_at": {},
+        "elapsed_ms": 0.0,
     }
-    if next_mine is None:
-        return empty_result
-
-    # Built ONCE for the whole rollout (all n iterations share it): the
-    # deduped, market-rank-sorted available list. Per-iteration state only
-    # needs a `gone` set of names taken *during that simulation*.
-    avail_sorted = sorted(ds.available(state, board), key=ds.market_rank)
+    avail_sorted = sorted(ds.available(state, board), key=ds.market_rank) if future else []
     if not avail_sorted:
-        return empty_result
+        result["elapsed_ms"] = (time.time() - t0) * 1000
+        return result
 
-    # Precomputed once: overall-rank order for the stand-in pick, and
-    # per-position overall-rank order for next_best lookups.
     standin_pool = sorted(
         (p for p in avail_sorted if p["pos"] not in ("K", "DST")
          and (p.get("overall_rank") or p.get("flex_rank"))),
@@ -88,21 +110,20 @@ def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
         pos: sorted((p for p in avail_sorted if p["pos"] == pos), key=_pos_rank_key)
         for pos in SKILL_POS
     }
-
+    keys = [dt.norm_name(p["name"]) for p in avail_sorted]
     base_counts = {t: dt.roster_of(state, t, board) for t in range(1, teams + 1)}
-
-    survival_hits: Counter = Counter()
-    survival_after_hits: Counter = Counter()
-    next_best_acc = {pos: {"proj": 0.0, "rank": 0.0, "n": 0, "names": Counter(), "runs": []}
-                     for pos in SKILL_POS}
-
+    hits = {m: Counter() for m in future}
+    acc = {
+        m: {
+            pos: {"proj": 0.0, "rank": 0.0, "n": 0, "names": Counter(), "runs": []}
+            for pos in SKILL_POS
+        }
+        for m in future
+    }
     rng = random.Random(seed)
 
     def advance_bots(counts: dict, gone: set, start: int, end: int) -> None:
-        """Simulate bot picks for pick numbers [start, end) in place."""
-        for cur in range(start, end):
-            if cur > total_slots:
-                break
+        for cur in range(start, min(end, total_slots + 1)):
             team_slot = dt.snake_team_for_pick(cur, teams)
             rounds_left = rounds - (cur - 1) // teams
             bias = (pos_bias_by_slot or {}).get(team_slot)
@@ -110,16 +131,11 @@ def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
             gone.add(dt.norm_name(p["name"]))
             counts[team_slot][p["pos"]] = counts[team_slot].get(p["pos"], 0) + 1
 
-    for _ in range(n):
-        counts = {t: dict(c) for t, c in base_counts.items()}
-        gone: set = set()
-
-        advance_bots(counts, gone, bot_start, next_mine)
-
-        for p in avail_sorted:
-            if dt.norm_name(p["name"]) not in gone:
-                survival_hits[dt.norm_name(p["name"])] += 1
-
+    def record(m: int, gone: set) -> None:
+        h = hits[m]
+        for k in keys:
+            if k not in gone:
+                h[k] += 1
         for pos in SKILL_POS:
             top2 = []
             for p in by_pos[pos]:
@@ -127,59 +143,54 @@ def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
                     top2.append(p)
                     if len(top2) == NEXT_BEST_DEPTH:
                         break
-            if top2:
-                best = top2[0]
-                second = top2[1] if len(top2) > 1 else None
-                acc = next_best_acc[pos]
-                acc["n"] += 1
-                acc["proj"] += best.get("proj_points") or 0.0
-                acc["rank"] += _pos_rank_key(best)
-                acc["names"][best["name"]] += 1
-                # per-run (best, second) so a candidate can be compared with
-                # the best OTHER player at his position (see vona / wait_for)
-                acc["runs"].append(
-                    (
-                        best["name"],
-                        best.get("proj_points") or 0.0,
-                        second["name"] if second else None,
-                        (second.get("proj_points") or 0.0) if second else 0.0,
-                    )
+            if not top2:
+                continue
+            best = top2[0]
+            second = top2[1] if len(top2) > 1 else None
+            a = acc[m][pos]
+            a["n"] += 1
+            a["proj"] += best.get("proj_points") or 0.0
+            a["rank"] += _pos_rank_key(best)
+            a["names"][best["name"]] += 1
+            a["runs"].append(
+                (
+                    best["name"],
+                    best.get("proj_points") or 0.0,
+                    second["name"] if second else None,
+                    (second.get("proj_points") or 0.0) if second else 0.0,
                 )
+            )
 
-        if after is not None:
-            standin = next((p for p in standin_pool if dt.norm_name(p["name"]) not in gone), None)
+    for _ in range(n):
+        counts = {t: dict(c) for t, c in base_counts.items()}
+        gone: set = set()
+        cur = bot_start
+        for m in future:
+            advance_bots(counts, gone, cur, m)
+            record(m, gone)
+            standin = _standin_pick(standin_pool, gone, counts[slot])
             if standin is not None:
                 gone.add(dt.norm_name(standin["name"]))
                 counts[slot][standin["pos"]] = counts[slot].get(standin["pos"], 0) + 1
+            cur = m + 1
 
-            advance_bots(counts, gone, next_mine + 1, after)
-
-            for p in avail_sorted:
-                if dt.norm_name(p["name"]) not in gone:
-                    survival_after_hits[dt.norm_name(p["name"])] += 1
-
-    survival = {dt.norm_name(p["name"]): survival_hits[dt.norm_name(p["name"])] / n
-                for p in avail_sorted}
-    survival_after = ({dt.norm_name(p["name"]): survival_after_hits[dt.norm_name(p["name"])] / n
-                        for p in avail_sorted} if after is not None else {})
-
-    next_best = {}
-    for pos, acc in next_best_acc.items():
-        if acc["n"]:
-            p50_name = acc["names"].most_common(1)[0][0]
-            next_best[pos] = {
-                "mean_proj": acc["proj"] / acc["n"],
-                "mean_rank": acc["rank"] / acc["n"],
-                "p50_name": p50_name,
-                "runs": acc["runs"],
-            }
-
-    return {
-        "n": n, "next_mine": next_mine, "after": after,
-        "survival": survival, "survival_after": survival_after,
-        "next_best": next_best,
-        "elapsed_ms": (time.time() - t0) * 1000,
-    }
+    for m in future:
+        result["survival_at"][m] = {k: hits[m][k] / n for k in keys}
+        nb = {}
+        for pos, a in acc[m].items():
+            if a["n"]:
+                nb[pos] = {
+                    "mean_proj": a["proj"] / a["n"],
+                    "mean_rank": a["rank"] / a["n"],
+                    "p50_name": a["names"].most_common(1)[0][0],
+                    "runs": a["runs"],
+                }
+        result["next_best_at"][m] = nb
+    result["survival"] = result["survival_at"].get(next_mine, {})
+    result["survival_after"] = result["survival_at"].get(after, {}) if after else {}
+    result["next_best"] = result["next_best_at"].get(next_mine, {})
+    result["elapsed_ms"] = (time.time() - t0) * 1000
+    return result
 
 
 def _excluding(candidate: dict, nb: dict) -> tuple[float, Counter] | None:

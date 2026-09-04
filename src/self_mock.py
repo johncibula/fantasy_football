@@ -144,6 +144,7 @@ def main() -> None:
     global ORDER_SEASON, SHUFFLE_ORDER
     ORDER_SEASON, SHUFFLE_ORDER = args.order, args.shuffle
     if args.fast or os.environ.get("SELF_MOCK_FAST"):
+        draft_live.QUEUE_ENABLED = False
         draft_live.ROLLOUT_N = draft_live.FAST_ROLLOUT_N
     slots = [int(s) for s in args.batch.split(",")] if args.batch else [args.slot]
     results = []
