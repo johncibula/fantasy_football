@@ -22,6 +22,7 @@ import draft_sim as ds
 import draft_tracker as dt
 
 SKILL_POS = ("QB", "RB", "WR", "TE")
+NEXT_BEST_DEPTH = 2  # best and runner-up per position, so a candidate is compared with the best OTHER player
 
 # Sort key mirroring draft_tracker.best_available's ranking (overall_rank,
 # with its same quirky flex_rank fallback) — used for our own stand-in pick
@@ -92,7 +93,7 @@ def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
 
     survival_hits: Counter = Counter()
     survival_after_hits: Counter = Counter()
-    next_best_acc = {pos: {"proj": 0.0, "rank": 0.0, "n": 0, "names": Counter()}
+    next_best_acc = {pos: {"proj": 0.0, "rank": 0.0, "n": 0, "names": Counter(), "runs": []}
                      for pos in SKILL_POS}
 
     rng = random.Random(seed)
@@ -120,13 +121,30 @@ def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
                 survival_hits[dt.norm_name(p["name"])] += 1
 
         for pos in SKILL_POS:
-            best = next((p for p in by_pos[pos] if dt.norm_name(p["name"]) not in gone), None)
-            if best is not None:
+            top2 = []
+            for p in by_pos[pos]:
+                if dt.norm_name(p["name"]) not in gone:
+                    top2.append(p)
+                    if len(top2) == NEXT_BEST_DEPTH:
+                        break
+            if top2:
+                best = top2[0]
+                second = top2[1] if len(top2) > 1 else None
                 acc = next_best_acc[pos]
                 acc["n"] += 1
                 acc["proj"] += best.get("proj_points") or 0.0
                 acc["rank"] += _pos_rank_key(best)
                 acc["names"][best["name"]] += 1
+                # per-run (best, second) so a candidate can be compared with
+                # the best OTHER player at his position (see vona / wait_for)
+                acc["runs"].append(
+                    (
+                        best["name"],
+                        best.get("proj_points") or 0.0,
+                        second["name"] if second else None,
+                        (second.get("proj_points") or 0.0) if second else 0.0,
+                    )
+                )
 
         if after is not None:
             standin = next((p for p in standin_pool if dt.norm_name(p["name"]) not in gone), None)
@@ -153,6 +171,7 @@ def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
                 "mean_proj": acc["proj"] / acc["n"],
                 "mean_rank": acc["rank"] / acc["n"],
                 "p50_name": p50_name,
+                "runs": acc["runs"],
             }
 
     return {
@@ -163,16 +182,56 @@ def rollout(state: dict, board: dict, n: int = 200, seed: int | None = None,
     }
 
 
+def _excluding(candidate: dict, nb: dict) -> tuple[float, Counter] | None:
+    """Mean projection and name counts of the best OTHER player at the candidate's position.
+
+    Measured at our next pick and excluding the candidate himself; without
+    this, a player who usually survives is compared with... himself.
+    """
+    runs = nb.get("runs") or []
+    if not runs:
+        return None
+    me = candidate.get("name")
+    tot, names = 0.0, Counter()
+    for best, best_proj, second, second_proj in runs:
+        if best == me:
+            tot += second_proj
+            if second:
+                names[second] += 1
+        else:
+            tot += best_proj
+            names[best] += 1
+    return tot / len(runs), names
+
+
 def vona(candidate: dict, result: dict) -> float | None:
-    """Value Over Next Available: candidate['proj_points'] minus the mean
-    projection of the best player likely available at his position at our
-    next pick. Positive means taking him now beats waiting. None if we lack
-    a projection for the candidate or no next_best data for his position."""
+    """Value Over Next Available, in projected points.
+
+    The candidate's projection minus the mean projection of the best OTHER
+    player likely available at his position at our next pick. Positive means
+    taking him now beats waiting. None without a projection or next_best data.
+    """
     proj = candidate.get("proj_points")
     nb = result.get("next_best", {}).get(candidate.get("pos"))
     if proj is None or not nb:
         return None
-    return proj - nb["mean_proj"]
+    ex = _excluding(candidate, nb)
+    base = ex[0] if ex else nb["mean_proj"]
+    return proj - base
+
+
+def wait_for(candidate: dict, result: dict) -> dict | None:
+    """Who you'd most likely get at this position next turn if the candidate is gone.
+
+    Returns {"name", "mean_proj"} or None without next_best data.
+    """
+    nb = result.get("next_best", {}).get(candidate.get("pos"))
+    if not nb:
+        return None
+    ex = _excluding(candidate, nb)
+    if not ex or not ex[1]:
+        return {"name": nb["p50_name"], "mean_proj": nb["mean_proj"]}
+    return {"name": ex[1].most_common(1)[0][0], "mean_proj": ex[0]}
 
 
 def _cli() -> None:

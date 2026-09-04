@@ -492,6 +492,42 @@ def tendencies_by_slot(order: list[int]) -> dict:
             for slot, team_id in enumerate(order, start=1)}
 
 
+def mock_order(season: int | None = None) -> tuple[list[int], dict[int, str]]:
+    """A past season's (draft order as team ids, {slot: team name}).
+
+    The stand-in for this year's order until ESPN publishes it. With no season
+    given, the latest pulled season is used. ([], {}) if none.
+    """
+    files = sorted(HISTORY_DIR.glob("draft_*.json"))
+    if not files:
+        return [], {}
+    path = HISTORY_DIR / f"draft_{season}.json" if season else files[-1]
+    if not path.exists():
+        return [], {}
+    h = json.loads(path.read_text())
+    order = [int(t) for t in h.get("order", [])]
+    teams = h.get("teams", {})
+    labels = {
+        i + 1: (teams.get(str(t)) or teams.get(t) or {}).get("name", f"team {t}")
+        for i, t in enumerate(order)
+    }
+    return order, labels
+
+
+def bias_for_slots(
+    order: list[int], round_no: int, positions: tuple[str, ...] = tuple(POS_LIST)
+) -> dict[int, dict[str, float]]:
+    """{slot: {pos: multiplier}} for the managers in `order` at this round.
+
+    What the bots and the survival model use to draft like the real people.
+    """
+    out: dict[int, dict[str, float]] = {}
+    for slot, prof in tendencies_by_slot(order).items():
+        if prof:
+            out[slot] = {pos: pos_multiplier(prof, pos, round_no) for pos in positions}
+    return out
+
+
 # --------------------------------------------------------------------------
 # dossier
 # --------------------------------------------------------------------------

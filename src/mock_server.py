@@ -4,6 +4,8 @@
 
 Endpoints (all GET, used by the dashboard's buttons):
   /api/start?slot=7   new mock; AI teams pick until our first turn
+                      (&order=2025|latest|none: which season's draft order the
+                       bots borrow so they draft like the real managers)
   /api/draft?name=X   we draft X; AI teams pick until our next turn
   /api/undo           rewind to the start of our previous turn
   /api/avail?q=text   search available players (for drafting off-list)
@@ -26,6 +28,7 @@ from draft_tracker import (load_board, load_state, save_state, norm_name,
                            snake_team_for_pick)
 from draft_live import build_live, write_live, REPORTS
 import draft_sim
+import league_history
 
 BOARD = load_board()
 RNG = random.Random()
@@ -151,6 +154,14 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path == "/api/start":
             slot = int(q.get("slot", ["7"])[0])
             state = {"teams": 16, "slot": slot, "rounds": 15, "picks": [], "mock": True}
+            # A past season's draft order makes the bots draft like the real managers
+            # (order=none turns it off; order=2025 picks a season).
+            want = q.get("order", ["latest"])[0]
+            if want != "none":
+                order, labels = league_history.mock_order(None if want == "latest" else int(want))
+                if order and len(order) == state["teams"]:
+                    state["team_ids"] = order
+                    state["team_labels"] = labels
             draft_sim.sim_until_my_turn(state, BOARD, RNG)
             save_state(state)
             write_live(state, BOARD)

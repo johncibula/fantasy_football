@@ -19,6 +19,12 @@ and is the place to look first; the short version is three groups of scripts:
 - **Practice and support** — `src/draft_sim.py` and `src/self_mock.py` for
   mock drafts, `src/mock_server.py` for the local dashboard,
   `src/espn_sync.py` and `src/mock_sync.py` for recovering state by hand.
+- **Public app** — `src/draft_app.py` (Streamlit) runs the same engine on a
+  visitor's own rankings: `src/rankings_import.py` fills the board schema
+  from any CSV, `src/draft_session.py` holds one draft in memory for any
+  league size, `src/sample_rankings.py` regenerates the bundled ESPN sample.
+  It must never read the owner's board, notes, player pages or tendencies;
+  the "Public app" section of `README.md` has the deploy checklist.
 
 The draft-night runbook, the setup steps, and the breakdown of how a pick is
 scored are all in `README.md`. Ongoing engine work is planned in `docs/plans/`,

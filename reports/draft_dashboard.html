@@ -146,6 +146,7 @@ h2 { font-family:"Barlow Condensed",sans-serif; font-size:16px; letter-spacing:1
   <div id="updated">–</div>
 </header>
 <div id="turnbar"></div>
+<div id="onclock" style="display:none; padding:4px 18px; font-size:12.5px; color:var(--ink2);"></div>
 <div id="teamsview" style="display:none; padding:14px 18px;">
   <div id="marketcard" style="margin-bottom:14px;"></div>
   <div id="teamsgrid"></div>
@@ -229,15 +230,20 @@ function profBlock(r, i){
   if (prof && prof.injury) extra += '<div><strong>Injury:</strong> '+esc(prof.injury)+(prof.injury_date?' ('+esc(prof.injury_date)+')':'')+'</div>';
   if (prof && prof.news && prof.news.length) extra += '<div><strong>News:</strong> '+prof.news.map(n=>esc(n.headline)+' <small>('+esc(n.age)+')</small>').join(' · ')+'</div>';
   if (prof && prof.hosts && Object.keys(prof.hosts).length) extra += '<div><small>Hosts: '+Object.entries(prof.hosts).map(([h,r])=>esc(h)+' #'+r).join(' · ')+(prof.adp?' · FF ADP '+esc(prof.adp):'')+'</small></div>';
-  return '<div class="prof" id="prof-'+i+'" hidden>'+extra+'<div><strong>'+src+':</strong> '+esc(text).replace(/&quot;/g,'"')+link+'</div></div>';
+  return '<div class="prof" id="prof-'+i+'"'+(openWhy.has(r.name)?'':' hidden')+'>'+extra+'<div><strong>'+src+':</strong> '+esc(text).replace(/&quot;/g,'"')+link+'</div></div>';
 }
-function toggleWhy(btn, i){
+// Rows the user has expanded, by player name — the board re-renders every
+// poll, so this is what keeps a "more" panel open across refreshes.
+const openWhy = new Set();
+let lastRecsJson = '';
+function toggleWhy(btn, i, name){
+  const open = !openWhy.has(name);
+  if (open) openWhy.add(name); else openWhy.delete(name);
   const pr = document.getElementById('prof-'+i);
-  if (pr) pr.hidden = !pr.hidden;
+  if (pr) pr.hidden = !open;
   const el = document.getElementById('whyrest-'+i);
-  if (!el) return;
-  el.hidden = !el.hidden;
-  btn.textContent = el.hidden ? '▸ more' : '▾ less';
+  if (el) el.hidden = !open;
+  btn.textContent = open ? '▾ less' : '▸ more';
 }
 async function api(path){
   try {
@@ -290,8 +296,19 @@ async function tick(){
       tb.textContent = u === 0 ? '▶ YOUR PICK — ON THE CLOCK'
         : 'YOUR TURN IN ' + u + ' PICK' + (u === 1 ? '' : 'S') + '  (pick #' + d.next_mine + ')';
     }
+    // who is on the clock, and what they tend to do (learned from past drafts)
+    const oc = document.getElementById('onclock');
+    if (u !== 0 && d.on_clock_slot) {
+      const nm = (d.team_labels||{})[d.on_clock_slot] || ('slot ' + d.on_clock_slot);
+      const habits = (d.on_clock_dna && d.on_clock_dna.labels && d.on_clock_dna.labels.length)
+        ? ' · ' + d.on_clock_dna.labels.join(', ') : '';
+      oc.textContent = 'On the clock: ' + nm + ' (slot ' + d.on_clock_slot + ')' + habits;
+      oc.style.display = 'block';
+    } else { oc.style.display = 'none'; }
     document.getElementById('needline').textContent =
       Object.entries(d.my_counts).map(([p,c])=>p+':'+c).join('  ');
+    const recsJson = JSON.stringify(d.recs);
+    if (recsJson !== lastRecsJson) { lastRecsJson = recsJson;
     document.getElementById('recs').innerHTML = d.recs.map((r,i)=>{
       const inj = r.injury;
       const injTitle = inj ? [inj.body_part, inj.status, inj.updated].filter(Boolean).join(' · ') : '';
@@ -303,7 +320,7 @@ async function tick(){
       const withDelta = why.filter(f=>f.delta!=null);
       const top4 = withDelta.slice().sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).slice(0,4);
       const rest = why.filter(f=>top4.indexOf(f)===-1);
-      const waitLine = r.wait ? '<span class="wait">if you wait: '+esc(r.pos)+' → '+esc(r.wait.name)+' (~'+r.wait.proj+' pts)</span>' : '';
+      const waitLine = r.wait ? '<span class="wait">if he\'s gone, best '+esc(r.pos)+' next turn: '+esc(r.wait.name)+' (~'+r.wait.proj+' pts)</span>' : '';
       return '<div class="rec">'+
       '<span class="i">'+(i+1)+'</span>'+
       '<span class="pos '+r.pos+'">'+(r.pos==='DST'?'D':r.pos)+'</span>'+
@@ -314,11 +331,11 @@ async function tick(){
       (r.notes.length?'<span class="note">✎ '+r.notes.join(' · ')+'</span>':'')+
       waitLine+
       '<span class="why-top">'+top4.map(factorSpan).join('')+
-        ((rest.length||r.outlook||r.profile)?'<span class="why-toggle" onclick="toggleWhy(this,'+i+')">▸ more</span>':'')+'</span>'+
-      (rest.length?'<div class="why-rest" id="whyrest-'+i+'" hidden>'+rest.map(factorSpan).join('')+'</div>':'')+
+        ((rest.length||r.outlook||r.profile)?'<span class="why-toggle" onclick="toggleWhy(this,'+i+',\''+r.name.replace(/'/g,"\\'")+'\')">'+(openWhy.has(r.name)?'▾ less':'▸ more')+'</span>':'')+'</span>'+
+      (rest.length?'<div class="why-rest" id="whyrest-'+i+'"'+(openWhy.has(r.name)?'':' hidden')+'>'+rest.map(factorSpan).join('')+'</div>':'')+
       profBlock(r, i)+
       '</div>';
-    }).join('');
+    }).join(''); }
     document.getElementById('myroster').innerHTML =
       d.my_roster.map(n=>'<span>'+n+'</span>').join('') || '<span>—</span>';
     const runs = Object.entries(d.runs).sort((a,b)=>b[1]-a[1]);

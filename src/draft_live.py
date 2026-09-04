@@ -68,6 +68,12 @@ VBD_WEIGHT = 0.4
 # this room QBs go in rounds 3-6 (league history: median first QB round 5.3,
 # ESPN ADP has 12+ gone by pick 90), so the punt was dying before it fired.
 STARTABLE_QB = 16
+RB_DEPTH_TARGET = 5
+RB_DEPTH_PUSH = 12.0  # rank points per missing RB from round 5 on (was 8: never actually reached 5)
+PAIR_GAP = 8  # picks between our two picks for "pair plan" logic to apply
+PAIR_SURV_SAFE = 0.7  # he will still be there at the very next pick: take the other one first
+PAIR_SURV_GONE = 0.35  # he will not: now or never
+RB_DEPTH_FROM_ROUND = 5
 
 
 def cookies():
@@ -146,16 +152,29 @@ def replacement_depths(cfg: dict | None = None) -> dict[str, int]:
     return _DEPTHS
 
 
-def replacement_baselines(board: dict) -> dict:
+def _baselines_for(board: dict, depths: dict[str, int]) -> dict[str, float]:
+    """Projected points of the replacement-level player per position, at `depths`."""
+    out: dict[str, float] = {}
+    for pos, n in depths.items():
+        pts = sorted(
+            (p["proj_points"] for p in board.values() if p["pos"] == pos and p.get("proj_points")),
+            reverse=True,
+        )
+        out[pos] = pts[n - 1] if len(pts) >= n else (pts[-1] if pts else 0)
+    return out
+
+
+def replacement_baselines(board: dict, cfg: dict | None = None) -> dict:
     """Projected points of the replacement-level player per position.
-    Cached — board is static."""
+
+    With `cfg` (config.yaml shape) the answer is for that league and is not
+    cached; without it, the owner's league, cached because the board is static.
+    """
+    if cfg is not None:
+        return _baselines_for(board, replacement_depths(cfg))
     global _BASELINES
     if _BASELINES is None:
-        _BASELINES = {}
-        for pos, n in replacement_depths().items():
-            pts = sorted((p["proj_points"] for p in board.values()
-                          if p["pos"] == pos and p.get("proj_points")), reverse=True)
-            _BASELINES[pos] = pts[n - 1] if len(pts) >= n else (pts[-1] if pts else 0)
+        _BASELINES = _baselines_for(board, replacement_depths())
     return _BASELINES
 
 
@@ -175,7 +194,36 @@ def _percentile(sorted_xs: list[float], q: float) -> float:
     return sorted_xs[lo] + (sorted_xs[hi] - sorted_xs[lo]) * (i - lo)
 
 
-def vbd_calibration(board: dict, top: int = 150) -> dict:
+def _calibration_for(board: dict, baselines: dict, top: int) -> dict:
+    """The slope/anchor record `vbd_calibration` documents, for one board and baseline set."""
+    seen, rows = set(), []
+    for p in board.values():
+        if id(p) in seen:
+            continue
+        seen.add(id(p))
+        if p.get("overall_rank"):
+            rows.append(p)
+    rows.sort(key=lambda p: p["overall_rank"])
+    rows = rows[:top]
+    ranks = sorted(float(p["overall_rank"]) for p in rows)
+    vbds = sorted(vbd_of(p, baselines) for p in rows)
+    rank_spread = _percentile(ranks, 90) - _percentile(ranks, 10)
+    vbd_spread = abs(_percentile(vbds, 10) - _percentile(vbds, 90))
+    slope = (rank_spread / vbd_spread) if vbd_spread else 0.0
+    vbd_max = max(vbds) if vbds else 0.0
+    return {
+        "slope": slope,
+        "vbd_max": vbd_max,
+        "anchor": 1.0 + vbd_max * slope,
+        "n": len(rows),
+        "rank_p10": _percentile(ranks, 10),
+        "rank_p90": _percentile(ranks, 90),
+        "vbd_p10": _percentile(vbds, 10),
+        "vbd_p90": _percentile(vbds, 90),
+    }
+
+
+def vbd_calibration(board: dict, top: int = 150, cfg: dict | None = None) -> dict:
     """Put VBD on the same axis as UDK rank.
 
     slope = (p90 rank - p10 rank) / |p10 VBD - p90 VBD| over the top-`top`
@@ -187,34 +235,37 @@ def vbd_calibration(board: dict, top: int = 150) -> dict:
     `anchor` places the best VBD on the board at rank 1, so
     `anchor - vbd*slope` is "where this player would rank if the board were
     sorted by lineup value" and is directly comparable to `overall_rank`.
+
+    `cfg` (config.yaml shape) calibrates for another league without caching.
     """
+    if cfg is not None:
+        return _calibration_for(board, replacement_baselines(board, cfg), top)
     global _VBD_CAL
     if _VBD_CAL is None:
-        baselines = replacement_baselines(board)
-        seen, rows = set(), []
-        for p in board.values():
-            if id(p) in seen:
-                continue
-            seen.add(id(p))
-            if p.get("overall_rank"):
-                rows.append(p)
-        rows.sort(key=lambda p: p["overall_rank"])
-        rows = rows[:top]
-        ranks = sorted(float(p["overall_rank"]) for p in rows)
-        vbds = sorted(vbd_of(p, baselines) for p in rows)
-        rank_spread = _percentile(ranks, 90) - _percentile(ranks, 10)
-        vbd_spread = abs(_percentile(vbds, 10) - _percentile(vbds, 90))
-        slope = (rank_spread / vbd_spread) if vbd_spread else 0.0
-        vbd_max = max(vbds) if vbds else 0.0
-        _VBD_CAL = {
-            "slope": slope,
-            "vbd_max": vbd_max,
-            "anchor": 1.0 + vbd_max * slope,
-            "n": len(rows),
-            "rank_p10": _percentile(ranks, 10), "rank_p90": _percentile(ranks, 90),
-            "vbd_p10": _percentile(vbds, 10), "vbd_p90": _percentile(vbds, 90),
-        }
+        _VBD_CAL = _calibration_for(board, replacement_baselines(board), top)
     return _VBD_CAL
+
+
+def _room_pick(p: dict) -> float | None:
+    """The pick number the room takes this player at.
+
+    The owner's 12-team board ADP is scaled to 16 teams; an imported board
+    carries a market ADP that is already in this league's pick numbers.
+    """
+    adp = p.get("adp_overall")
+    if adp:
+        return adp * 4 / 3
+    return p.get("espn_adp")
+
+
+def league_config(state: dict) -> dict | None:
+    """The league shape a generic draft state carries under "league".
+
+    Returned in config.yaml form for the replacement-depth math (see
+    draft_session); None means the owner's own config.yaml applies.
+    """
+    league = state.get("league")
+    return {"league": league} if league else None
 
 
 # ---------------------------------------------------------------------------
@@ -232,8 +283,12 @@ _PRACTICE_FLAGS = {"DNP", "DID NOT PARTICIPATE", "LIMITED", "LIMITED PARTICIPATI
 
 _DNP_NEWS = re.compile(r"(no practice|doesn'?t practice|not practic|sidelined|sitting out|stting out|"
                        r"misses practice|did not practice|dnp|out for|ruled out|carted|placed on)", re.I)
-_GOOD_NEWS = re.compile(r"(full(y)? practice|returns to practice|back at practice|cleared|good to go|"
-                        r"expected to play|optimism|trending toward.*return|no injury designation)", re.I)
+_GOOD_NEWS = re.compile(
+    r"(full(y)? practic|practic\w*\s+(fully|in full)|full participant|returns? to practice|"
+    r"back at practice|cleared|good to go|expected to play|optimism|"
+    r"trending toward.*return|no injury designation|removed from.*report)",
+    re.I,
+)
 
 
 def injury_adjust(record: dict | None, profile: dict | None = None) -> tuple[float, str]:
@@ -314,9 +369,11 @@ class ScoreCtx:
     inj: dict
     lineup: dict
     bias: dict | None = None
-    startable_qbs_left: int = 99      # QBs ranked <= STARTABLE_QB still on the board
-    startable_qb_exp: float = 99.0    # ...expected to survive to our next pick
-    startable_qb_p_any: float = 1.0   # P(at least one of them survives) — variance-aware
+    startable_qbs_left: int = 99  # QBs ranked <= STARTABLE_QB still on the board
+    startable_qb_exp: float = 99.0  # ...expected to survive to our next pick
+    startable_qb_p_any: float = 1.0  # P(at least one of them survives) — variance-aware
+    qb_targets_in_use: bool = True
+    depths: dict = field(default_factory=replacement_depths)
     _surv_cache: dict = field(default_factory=dict)
 
     def survival(self, p: dict) -> float:
@@ -424,13 +481,14 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
     if has_vbd:
         vbd_rank = ctx.anchor - vbd * ctx.slope
         add("VBD", VBD_WEIGHT * vbd_rank,
-            f"+{vbd:.0f} pts over {pos}{replacement_depths()[pos]} replacement "
+            f"+{vbd:.0f} pts over {pos}{ctx.depths[pos]} replacement "
             f"= VBD-rank {vbd_rank:.0f} x {VBD_WEIGHT:.2f}")
     else:
         add("VBD", None, f"no replacement baseline for {pos}")
 
     # --- VONA --------------------------------------------------------------
     v = lookahead.vona(p, ctx.look)
+    wf = lookahead.wait_for(p, ctx.look)
     if v is not None:
         raw = v * ctx.slope * 0.5  # rank units; >0 = better than the wait
         # next_best is measured at the rollout's next_mine (the pick AFTER the
@@ -440,13 +498,16 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
             # A bonus only to the extent he might NOT last: if he survives, the
             # "next best" at the position is him and the gap is illusory.
             delta = -raw * (1 - surv)
-            reason = (f"+{v:.0f} pts over the likely R{nb_round} "
-                      f"{pos} ({ctx.look['next_best'][pos]['p50_name']}), "
-                      f"x {(1 - surv):.0%} chance he's gone")
+            reason = (
+                f"+{v:.0f} pts over the best other {pos} likely there in R{nb_round} "
+                f"({wf['name'] if wf else '—'}), x {(1 - surv):.0%} chance he's gone"
+            )
         else:
             delta = -raw
-            reason = (f"{v:.0f} pts vs the likely R{nb_round} "
-                      f"{pos} ({ctx.look['next_best'][pos]['p50_name']}) — waiting is fine")
+            reason = (
+                f"{v:.0f} pts vs the best other {pos} likely there in R{nb_round} "
+                f"({wf['name'] if wf else '—'}) — waiting is fine"
+            )
         delta = max(-12.0, min(12.0, delta))
         add("VONA", delta, reason)
 
@@ -462,6 +523,26 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
         add("Market", None,
             f"ESPN #{p.get('espn_rank')} (ADP {p.get('espn_adp') or '—'}) vs UDK "
             f"#{p.get('overall_rank')}: {md:+d} — {read}")
+
+    # Pair plan: with two picks only a few selections apart, survival is near-certain,
+    # so the question becomes which of the two you lose by waiting.
+    gap = (
+        (ctx.after - ctx.pick_no) if ctx.next_mine == ctx.pick_no else (ctx.next_mine - ctx.pick_no)
+    )
+    if pos in ("QB", "RB", "WR", "TE") and 1 < gap <= PAIR_GAP:
+        if surv >= PAIR_SURV_SAFE:
+            delta = round(6.0 * (surv - 0.5) / 0.5, 1)
+            add(
+                "Pair plan",
+                delta,
+                f"{surv:.0%} likely there at your very next pick (#{ctx.surv_end}) — take who won't be",
+            )
+        elif surv <= PAIR_SURV_GONE:
+            add(
+                "Pair plan",
+                -6.0,
+                f"only {surv:.0%} likely there at your very next pick (#{ctx.surv_end}) — now or never",
+            )
 
     # --- Survival (context only) -------------------------------------------
     src = "rollout" if norm_name(p["name"]) in ctx.look.get("survival", {}) else "analytic"
@@ -540,6 +621,12 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
                     f"last starter-quality QBs: ~{ctx.startable_qb_exp:.1f} of "
                     f"{ctx.startable_qbs_left} top-{STARTABLE_QB} QBs survive to your next "
                     f"turn ({ctx.startable_qb_p_any:.0%} chance any does)")
+            elif not ctx.qb_targets_in_use:
+                add(
+                    "QB plan",
+                    None,
+                    "no QB targets tagged — the starter-count rule above is the only QB timer",
+                )
             elif ctx.tagged_qbs_left == 0 and startable and \
                     (ctx.startable_qbs_left <= 3 or ctx.startable_qb_exp <= 2.0):
                 # Targets are gone and the market will leave ~2 or fewer real
@@ -569,9 +656,11 @@ def score_candidate(p: dict, ctx: ScoreCtx) -> tuple[float, list[dict]]:
             add("QB plan", 15.0, "QB2 is a luxury in a 1-QB league — wait for R12+")
 
     # --- RB depth -----------------------------------------------------------
+    # John's call (2026-09-03): five RBs, not four — two starters plus the
+    # flex plus real injury cover in a 16-team league.
     rb_have = ctx.my_counts.get("RB", 0)
-    if pos == "RB" and rb_have < 4 and ctx.round_next >= 5:
-        add("RB depth", -8.0 * (4 - rb_have), f"only {rb_have} RBs — depth beats WR hoarding")
+    if pos == "RB" and rb_have < RB_DEPTH_TARGET and ctx.round_next >= RB_DEPTH_FROM_ROUND:
+        add("RB depth", -RB_DEPTH_PUSH * (RB_DEPTH_TARGET - rb_have), f"only {rb_have} RBs — depth beats WR hoarding")
 
     # --- WR surplus ---------------------------------------------------------
     wr_have = ctx.my_counts.get("WR", 0)
@@ -635,6 +724,7 @@ def build_live(state: dict, board: dict) -> dict:
     recs = []
     tagged_qbs_left = 0
     qb_exp_surv = 0.0
+    qb_targets_in_use = True
     startable_qbs_left, startable_qb_exp, startable_qb_p_any = 0, 0.0, 0.0
     if next_mine:
         picks_remaining = len(upcoming)
@@ -654,6 +744,11 @@ def build_live(state: dict, board: dict) -> dict:
             and ({"value", "breakout"} & set(bp.get("my_tags", [])))
         ]
         tagged_qbs_left = len(tagged_qb_pool)
+        qb_targets_in_use = any(
+            {"value", "breakout"} & set(bp.get("my_tags", []))
+            for bp in board.values()
+            if bp["pos"] == "QB"
+        )
         qb_exp_surv = sum(_surv_of(bp) for bp in tagged_qb_pool)
         startable_qb_pool = list({id(bp): bp for k, bp in board.items()
                                   if bp["pos"] == "QB" and k not in gone
@@ -677,18 +772,20 @@ def build_live(state: dict, board: dict) -> dict:
         ]
         te_exp_surv = sum(_surv_of(bp) for bp in tagged_te_pool)
 
-        cal = vbd_calibration(board)
+        league = league_config(state)
+        cal = vbd_calibration(board, cfg=league)
         ctx = ScoreCtx(
             state=state, board=board, my_counts=my_counts, pick_no=pick_no,
             next_mine=next_mine, after=after, round_next=round_next,
             picks_remaining=picks_remaining, surv_start=surv_start, surv_end=surv_end,
             need_dst=need_dst, need_k=need_k, tagged_qbs_left=tagged_qbs_left,
             qb_exp_surv=qb_exp_surv, te_exp_surv=te_exp_surv, look=look,
-            baselines=replacement_baselines(board), slope=cal["slope"],
+            baselines=replacement_baselines(board, league), slope=cal["slope"],
             anchor=cal["anchor"], inj=inj,
             lineup=my_lineup(state, board, slot), bias=bias,
             startable_qbs_left=startable_qbs_left, startable_qb_exp=startable_qb_exp,
             startable_qb_p_any=startable_qb_p_any,
+            qb_targets_in_use=qb_targets_in_use, depths=replacement_depths(league),
         )
 
         candidates = best_available(state, board, limit=40)
@@ -714,7 +811,7 @@ def build_live(state: dict, board: dict) -> dict:
             score, why = score_candidate(p, ctx)
             surv = ctx.survival(p)
             record = inj.get(norm_name(p["name"]))
-            nb = look.get("next_best", {}).get(p["pos"])
+            nb = lookahead.wait_for(p, look)
             recs.append({
                 "name": p["name"], "pos": p["pos"], "team": p["team"], "bye": p.get("bye"),
                 "tier": p.get("tier"), "rank": p.get("overall_rank"),
@@ -729,7 +826,7 @@ def build_live(state: dict, board: dict) -> dict:
                 "injury": ({"chip": record.get("chip"), "status": record.get("status"),
                             "body_part": record.get("body_part"),
                             "updated": record.get("updated")} if record else None),
-                "wait": ({"name": nb["p50_name"], "proj": round(nb["mean_proj"], 1)}
+                "wait": ({"name": nb["name"], "proj": round(nb["mean_proj"], 1)}
                          if nb else None),
                 "espn_rank": p.get("espn_rank"), "espn_adp": p.get("espn_adp"),
                 "market_delta": p.get("market_delta"),
@@ -769,8 +866,7 @@ def build_live(state: dict, board: dict) -> dict:
     notes = []
     for pos in ("RB", "WR", "TE", "QB"):
         expected = sum(1 for p in board.values()
-                       if p["pos"] == pos and p.get("adp_overall")
-                       and p["adp_overall"] * 4 / 3 <= made)
+                       if p["pos"] == pos and (room := _room_pick(p)) and room <= made)
         actual = drafted_pos.get(pos, 0)
         delta = actual - expected
         pos_flow[pos] = {"taken": actual, "expected": expected, "delta": delta}
@@ -796,7 +892,11 @@ def build_live(state: dict, board: dict) -> dict:
             notes.append(f"QB: the room is taking the last starter-quality QBs — only "
                          f"~{startable_qb_exp:.1f} of {startable_qbs_left} top-{STARTABLE_QB} "
                          f"QBs expected to survive to your next pick.")
-        if tagged_qbs_left == 0:
+        if not qb_targets_in_use:
+            notes.append(
+                "No QB targets tagged — the QB timer runs on starter-quality survivors alone."
+            )
+        elif tagged_qbs_left == 0:
             notes.append("Your QB target pool is EMPTY — take the best remaining QB soon.")
         elif qb_exp_surv < 1.5:
             notes.append(f"QB punt at risk: only ~{qb_exp_surv:.1f} of your {tagged_qbs_left} "
@@ -828,15 +928,26 @@ def build_live(state: dict, board: dict) -> dict:
         "recs": recs[:14],
         "market": {"pos_flow": pos_flow, "notes": notes[:5]},
         "runs": runs,
-        "recent": [{"pick": p["pick"], "name": p["name"], "team": p["team"]} for p in state["picks"][-10:]],
+        "recent": [
+            {"pick": p["pick"], "name": p["name"], "team": p["team"]} for p in state["picks"][-10:]
+        ],
         "rosters": rosters,
-        "next_best": look.get("next_best", {}),
-        "qb_watch": {"have": my_counts.get("QB", 0), "startable_left": startable_qbs_left,
-                     "exp_survive": round(startable_qb_exp, 2), "p_any": round(startable_qb_p_any, 2),
-                     "targets_left": tagged_qbs_left, "targets_exp": round(qb_exp_surv, 2)},
+        "next_best": {
+            pos: {k: v for k, v in nb.items() if k != "runs"}
+            for pos, nb in look.get("next_best", {}).items()
+        },
+        "qb_watch": {
+            "have": my_counts.get("QB", 0),
+            "startable_left": startable_qbs_left,
+            "exp_survive": round(startable_qb_exp, 2),
+            "p_any": round(startable_qb_p_any, 2),
+            "targets_left": tagged_qbs_left,
+            "targets_exp": round(qb_exp_surv, 2),
+        },
         "lookahead_n": look.get("n", 0),
         "lookahead_ms": round(look.get("elapsed_ms", 0.0), 1),
         "dna": dna,
+        "on_clock_dna": (dna.get(on_clock) if on_clock else None),
         "injuries_asof": (injuries.load().get("fetched_at") or "")[:10],
         "market_asof": (board.get("__market_asof__") or ""),
         "build_ms": round((time.time() - t0) * 1000, 1),

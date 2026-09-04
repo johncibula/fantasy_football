@@ -37,18 +37,27 @@ def norm_name(name: str) -> str:
     return re.sub(r"\s+", " ", name)
 
 
+def index_board(players: list[dict]) -> dict:
+    """Index board records by normalised name, aliasing each D/ST under its nickname.
+
+    Draft rooms call a defence "Texans D/ST" where a board says "Houston Texans",
+    so every alias points at the same record; walk `values()` by identity.
+    """
+    idx = {norm_name(p["name"]): p for p in players}
+    for p in players:
+        if p["pos"] != "DST":
+            continue
+        nick = norm_name(p["name"]).split()[-1]
+        for alias in (nick, f"{nick} d/st", f"{nick} dst", f"{nick} defense"):
+            idx.setdefault(alias, p)
+    return idx
+
+
 def load_board() -> dict:
+    """The owner's board from data/board.json, indexed for the engine."""
     with open(DATA / "board.json") as f:
         board = json.load(f)
-    idx = {norm_name(p["name"]): p for p in board["players"]}
-    # ESPN draft rooms name defenses "Texans D/ST" while the board says
-    # "Houston Texans" — index D/STs under their nickname variants too.
-    for p in board["players"]:
-        if p["pos"] == "DST":
-            nick = norm_name(p["name"]).split()[-1]
-            for alias in (nick, f"{nick} d/st", f"{nick} dst", f"{nick} defense"):
-                idx.setdefault(alias, p)
-    return idx
+    return index_board(board["players"])
 
 
 def load_state() -> dict:
@@ -161,7 +170,14 @@ def survival_odds(state: dict, board: dict, candidate: dict, current_pick: int, 
 
 def best_available(state: dict, board: dict, limit: int = 24) -> list[dict]:
     gone = taken_names(state)
-    avail = [p for k, p in board.items() if k not in gone and (p.get("overall_rank") or p.get("flex_rank"))]
+    seen: set[int] = set()
+    avail = []
+    for p in board.values():
+        if id(p) in seen or norm_name(p["name"]) in gone:
+            continue
+        seen.add(id(p))
+        if p.get("overall_rank") or p.get("flex_rank"):
+            avail.append(p)
     return sorted(avail, key=lambda p: p.get("overall_rank") or 200 + (p.get("flex_rank") or 999))[:limit]
 
 

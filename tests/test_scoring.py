@@ -84,8 +84,12 @@ def _accumulate(deltas):
 def test_factors_sum_to_score_on_disk_state():
     state = dt.load_state()
     board = dt.load_board()
+    if len(state["picks"]) >= state["teams"] * state["rounds"]:
+        # the saved draft is finished (no picks left to recommend): replay
+        # its first eight rounds so the test still runs on a real board
+        state = {**state, "picks": state["picks"][: state["teams"] * 8]}
     live = dl.build_live(state, board)
-    assert live["recs"], "expected at least one rec from the on-disk draft state"
+    assert live["recs"], "expected at least one rec from the draft state"
     for rec in live["recs"]:
         deltas = [f["delta"] for f in rec["why"] if f["delta"] is not None]
         total = _accumulate(deltas)
@@ -217,3 +221,27 @@ def test_injury_adjust_uses_profile_evidence():
     assert pen2 == 2.0
     pen3, d3 = dl.injury_adjust(None, dnp)          # Sleeper silent, FF says hurt
     assert pen3 == 6.0 and d3.startswith("Questionable")
+
+
+def test_injury_good_news_word_order() -> None:
+    bare = {
+        "chip": "Q",
+        "status": "Questionable",
+        "body_part": "Shoulder",
+        "practice": None,
+        "updated": "2026-09-02",
+        "penalty": 6.0,
+    }
+    for headline in (
+        "Practices fully Tuesday",
+        "Full participant Wednesday",
+        "Returns to practice",
+    ):
+        pen, _ = dl.injury_adjust(
+            bare,
+            {
+                "injury": "Questionable (Shoulder)",
+                "news": [{"headline": headline, "age": "1 day ago"}],
+            },
+        )
+        assert pen == 2.0, headline

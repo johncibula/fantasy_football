@@ -142,3 +142,18 @@ def test_vona_none_without_projection():
     state = early_state()
     result = la.rollout(state, BOARD, n=50, seed=1)
     assert la.vona({"pos": "RB"}, result) is None
+
+
+def test_vona_and_wait_for_exclude_the_candidate_himself() -> None:
+    nb = {
+        "mean_proj": 190.0,
+        "p50_name": "A",
+        "runs": [("A", 190.0, "B", 170.0)] * 3 + [("B", 170.0, "C", 150.0)],
+    }
+    result = {"next_best": {"RB": nb}}
+    a = {"name": "A", "pos": "RB", "proj_points": 190.0}
+    # A is usually the best RB left; compared with the best OTHER RB he is +~25
+    assert round(la.vona(a, result), 1) == round(190.0 - (170.0 * 3 + 170.0) / 4, 1)
+    assert la.wait_for(a, result)["name"] == "B"
+    c = {"name": "C", "pos": "RB", "proj_points": 150.0}
+    assert la.wait_for(c, result)["name"] == "A"

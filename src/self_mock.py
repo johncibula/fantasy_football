@@ -28,8 +28,31 @@ from draft_tracker import load_board, norm_name, snake_team_for_pick
 import draft_live
 from draft_live import build_live
 import draft_sim
+import league_history
 
 BOARD = load_board()
+
+
+ORDER_SEASON: int | None = None  # --order: bots borrow that season's managers
+SHUFFLE_ORDER = False  # --shuffle: same managers, random slots (seeded)
+
+
+def mock_state(slot: int, seed: int) -> dict:
+    """A fresh mock state.
+
+    With ORDER_SEASON the bots are the real managers (learned habits) sitting
+    in that season's slots, or in random slots when SHUFFLE_ORDER is on.
+    """
+    state = {"teams": 16, "slot": slot, "rounds": 15, "picks": [], "mock": True}
+    if ORDER_SEASON:
+        order, labels = league_history.mock_order(ORDER_SEASON)
+        if len(order) == state["teams"]:
+            if SHUFFLE_ORDER:
+                names = {tid: labels[i + 1] for i, tid in enumerate(order)}
+                random.Random(seed * 7919).shuffle(order)
+                labels = {i + 1: names[tid] for i, tid in enumerate(order)}
+            state["team_ids"], state["team_labels"] = order, labels
+    return state
 
 
 def run_mock(slot: int, seed: int) -> dict:
@@ -40,7 +63,7 @@ def run_mock(slot: int, seed: int) -> dict:
     # built on it) nondeterministic — every one of the ~15 build_live() calls
     # per mock would roll different noise even for the same --seed.
     draft_live.ROLLOUT_SEED = seed
-    state = {"teams": 16, "slot": slot, "rounds": 15, "picks": [], "mock": True}
+    state = mock_state(slot, seed)
     total = 16 * 15
     while len(state["picks"]) < total:
         draft_sim.sim_until_my_turn(state, BOARD, rng)
@@ -103,10 +126,23 @@ def main() -> None:
     ap.add_argument("--batch", type=str)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--order",
+        type=int,
+        default=None,
+        help="borrow this season's draft order so bots use the managers' learned habits",
+    )
+    ap.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="with --order: same managers, random slots (seeded by --seed)",
+    )
     ap.add_argument("--fast", action="store_true",
                      help=f"lower the rollout to n={draft_live.FAST_ROLLOUT_N} "
                           "(build_live runs ~15x per mock; this keeps the batch harness fast)")
     args = ap.parse_args()
+    global ORDER_SEASON, SHUFFLE_ORDER
+    ORDER_SEASON, SHUFFLE_ORDER = args.order, args.shuffle
     if args.fast or os.environ.get("SELF_MOCK_FAST"):
         draft_live.ROLLOUT_N = draft_live.FAST_ROLLOUT_N
     slots = [int(s) for s in args.batch.split(",")] if args.batch else [args.slot]

@@ -20,6 +20,10 @@ Fantasy Footballers UDK rankings.
 | `src/lookahead.py` | Monte Carlo rollout of the remaining draft — survival odds and value-over-next-available (see `docs/plans/01-lookahead.md`) |
 | `src/injuries.py` | Live injury status from Sleeper's public player API, used to penalize hurt players (see `docs/plans/02-injuries.md`) |
 | `src/league_history.py` | Learns F³ managers' drafting tendencies from past ESPN drafts (see `docs/plans/03-league-history.md`) |
+| `src/rankings_import.py` | Any rankings CSV → the board schema the engine scores (the public app's input) |
+| `src/draft_session.py` | One draft in memory for any league size: mock vs bots or assist a live room, no disk state |
+| `src/draft_app.py` | Public Streamlit app: the engine on a visitor's own rankings (see "Public app" below) |
+| `src/sample_rankings.py` | Regenerates `samples/sample_rankings.csv` from ESPN's public rank, ADP, projections and byes |
 
 Planned, not yet built: `src/waivers.py`, `src/lineup.py`, `src/scout.py`, `src/report.py`.
 
@@ -81,6 +85,36 @@ factors sum exactly to the score:
 Self-play harness: `./venv/bin/python src/self_mock.py --batch "1,4,7,10,13,16" --seed 1`
 (`--fast` lowers the rollout for a quicker batch). The sweep that verified all
 of this, with old-vs-new numbers, is in `docs/plans/06-sweep.md`.
+
+## Public app (show it off without giving up the board)
+
+`src/draft_app.py` is the draft engine as a Streamlit app anyone can use with
+their own rankings. It never loads `data/board.json`, `data/notes/`,
+`data/players/`, `data/tendencies.json` or `.env`: a visitor uploads a CSV
+(Name and Pos required; Rank, Team, Bye, Tier, Proj, ADP, Tags optional) or
+uses the bundled sample built from ESPN's public default board, picks the
+league size, seat and mode, and gets the same recommendations, factor chips,
+Monte Carlo survival odds, market read, roster view and lookahead as the
+draft-night dashboard. Projections in the CSV unlock VBD and VONA; a Tags
+column replaces the notes files.
+
+```bash
+./venv/bin/streamlit run src/draft_app.py          # http://localhost:8501
+./venv/bin/python src/sample_rankings.py           # refresh the sample first
+```
+
+Deploying to Streamlit Community Cloud: push the repo to GitHub (a **private**
+repo still gives a public app URL), pick `src/draft_app.py` as the main file
+and Python 3.13 in the advanced settings. Before the first push, check that
+nothing private is tracked: `git status` must show nothing under `data/`
+except what you mean to publish, and `.gitignore`'s `!data/notes/` exception
+means the scouting notes WILL be added by `git add -A` unless you drop that
+line or never add `data/`. `config.yaml` is committed and holds no secrets.
+The app reads `DRAFT_ROLLOUT_N` if the host is slow (default 150 rollouts).
+
+The engine itself is unchanged for our draft: the app passes the league shape
+in `state["league"]` and the replacement-level math follows it; without that
+key everything runs off `config.yaml` exactly as before.
 
 ## Daily refresh (automatic, 06:30)
 

@@ -3,9 +3,9 @@ venv/
 __pycache__/
 *.pyc
 data/*
-!data/notes/
 reports/*
 !reports/draft_dashboard.html
 !reports/engine_guide.html
 .DS_Store
 .claude/settings.local.json
+.streamlit/secrets.toml
